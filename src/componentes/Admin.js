@@ -11,7 +11,7 @@ function Admin() {
     // Função para tocar o som (memoizada para não mudar a cada render)
     const tocarSom = useCallback(() => {
         audio.volume = 1; // Definir volume no máximo
-        audio.play().catch((err) => console.error('Erro ao tocar som:', err));
+        audio.play().catch(() => {});
     }, [audio]);
 
     // Carregar pedidos e tocar som quando houver novo pedido
