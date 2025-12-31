@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useCartWithPedidos } from '../store/useCart'
 import './Cardapio.css';
 
 function Cardapio() {
@@ -53,6 +54,8 @@ function Cardapio() {
         }
     };
 
+        const { criarPedido } = useCartWithPedidos()
+
     const calcularTotal = () => {
         return carrinho.reduce((total, item) => {
             const totalAdicionais = item.adicionais.reduce((soma, adicional) => soma + adicional.preco, 0);
@@ -85,28 +88,23 @@ function Cardapio() {
         const pedido = {
             cliente: nome,
             tipoEntrega,
-            endereco,
-            formaPagamento,
-            troco: formaPagamento === 'dinheiro' ? troco : 'Não necessário',
-            itens: carrinho,
-            total: calcularTotal(),
-        };
-
-        fetch('http://192.168.1.3:3000/pedidos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(pedido),
-        })
-            .then((res) => {
-                if (!res.ok) {
-                    throw new Error('Erro ao enviar o pedido.');
+            try {
+                const created = await criarPedido(pedido)
+                if (created) {
+                    alert('Pedido enviado com sucesso!');
+                    setCarrinho([]);
+                    setNome('');
+                    setTipoEntrega('');
+                    setEndereco('');
+                    setFormaPagamento('');
+                    setTroco('');
+                    setModalAberto(false);
+                } else {
+                    alert('Erro ao enviar o pedido.');
                 }
-                return res.json();
-            })
-            .then(() => {
-                alert('Pedido enviado com sucesso!');
-                setCarrinho([]);
-                setNome('');
+            } catch (e) {
+                alert('Erro ao enviar o pedido.');
+            }
                 setTipoEntrega('');
                 setEndereco('');
                 setFormaPagamento('');
