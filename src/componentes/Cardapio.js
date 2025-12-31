@@ -29,7 +29,7 @@ function Cardapio() {
             .then((data) => {
                 setCardapio(data);
             })
-            .catch((err) => console.error('Erro ao carregar o cardápio:', err)); 
+            .catch(() => {});
     }, []);
 
     const adicionarAoCarrinho = (item) => {
