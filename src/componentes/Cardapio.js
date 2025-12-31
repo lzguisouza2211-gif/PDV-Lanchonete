@@ -113,7 +113,7 @@ function Cardapio() {
                 setTroco('');
                 setModalAberto(false);
             })
-            .catch((err) => console.error('Erro ao enviar o pedido:', err));
+            .catch(() => {});
     };
 
     return (
