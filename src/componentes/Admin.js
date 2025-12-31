@@ -28,7 +28,7 @@ function Admin() {
                     }
                     setPedidos(pedidosOrdenados);
                 })
-                .catch((err) => console.error('Erro ao carregar os pedidos:', err));
+                .catch(() => {});
         };
 
         carregarPedidos();
