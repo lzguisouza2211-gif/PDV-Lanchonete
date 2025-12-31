@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './Admin.css';
 
 function Admin() {
@@ -7,6 +7,12 @@ function Admin() {
     const [statusAtualizando, setStatusAtualizando] = useState(null);
     const [audio] = useState(new Audio('/notification.mp3'));
     const [somHabilitado, setSomHabilitado] = useState(false);
+
+    // Função para tocar o som (memoizada para não mudar a cada render)
+    const tocarSom = useCallback(() => {
+        audio.volume = 1; // Definir volume no máximo
+        audio.play().catch((err) => console.error('Erro ao tocar som:', err));
+    }, [audio]);
 
     // Carregar pedidos e tocar som quando houver novo pedido
     useEffect(() => {
@@ -36,11 +42,7 @@ function Admin() {
         audio.play().catch(() => console.log("Som ativado, aguardando pedido."));
     };
 
-    // Função para tocar o som
-    const tocarSom = () => {
-        audio.volume = 1; // Definir volume no máximo
-        audio.play().catch((err) => console.error('Erro ao tocar som:', err));
-    };
+    // (tocarSom agora definido acima com useCallback)
 
     const atualizarStatus = (id, status) => {
         setStatusAtualizando(id);
