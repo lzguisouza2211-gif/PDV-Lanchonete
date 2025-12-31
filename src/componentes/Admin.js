@@ -39,7 +39,7 @@ function Admin() {
     // Forçar ativação do áudio com interação do usuário
     const ativarSom = () => {
         setSomHabilitado(true);
-        audio.play().catch(() => console.log("Som ativado, aguardando pedido."));
+        audio.play().catch(() => {});
     };
 
     // (tocarSom agora definido acima com useCallback)
