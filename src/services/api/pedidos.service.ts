@@ -11,9 +11,9 @@ export type Pedido = {
   itens: Item[];
   total: number;
   status?: string;
-  tipoEntrega?: string;
+  tipoentrega?: string;
   endereco?: string;
-  formaPagamento?: string;
+  formapagamento?: string;
   troco?: string | number;
 };
 
@@ -54,7 +54,23 @@ export const pedidosService = {
       logger.warn('supabase not initialized - pedidosService.create no-op');
       return null;
     }
-    const { data, error } = await (supabase as any).from('pedidos').insert([pedido]).select().single();
+
+    const payload = {
+      cliente: pedido.cliente,
+      itens: pedido.itens,
+      total: pedido.total,
+      status: pedido.status ?? 'Pendente',
+      tipoentrega: pedido.tipoentrega ?? null,
+      endereco: pedido.endereco ?? null,
+      formapagamento: pedido.formapagamento ?? null,
+      troco: pedido.troco ?? null,
+    };
+    const { data, error } = await (supabase as any)
+      .from('pedidos')
+      .insert([payload])
+      .select()
+      .single();
+
     if (error) {
       logger.error('pedidosService.create supabase error', error);
       return null;

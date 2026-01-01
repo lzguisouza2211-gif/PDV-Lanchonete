@@ -1,26 +1,40 @@
 import React, { useState } from 'react'
-import { useCartWithPedidos } from '../../store/useCart'
+import { useCardapio } from '../../hooks/useCardapio'
+import { useCartWithPedidos } from '../../store/useCartWithPedidos'
 
-// Página PDV — integra o fluxo de envio de pedido com `useCartWithPedidos`
-// Nota: não altera layout/JSX críticos — adiciona tratamento de submit para usar o service-backed hook.
 export default function Cardapio(): JSX.Element {
-  const { items, criarPedido } = useCartWithPedidos()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { itens, loading: carregandoCardapio, error: erroCardapio } = useCardapio()
+  const { items, add, criarPedido } = useCartWithPedidos()
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault()
-    setError(null)
-    setLoading(true)
+  const [loadingPedido, setLoadingPedido] = useState(false)
+  const [errorPedido, setErrorPedido] = useState<string | null>(null)
+
+  const [nome, setNome] = useState('')
+  const [tipoEntrega, setTipoEntrega] = useState<'retirada' | 'entrega'>('retirada')
+  const [endereco, setEndereco] = useState('')
+  const [formaPagamento, setFormaPagamento] = useState<'dinheiro' | 'cartao' | 'pix'>('dinheiro')
+  const [troco, setTroco] = useState('')
+
+  const handleSubmit = async () => {
+    setErrorPedido(null)
+    setLoadingPedido(true)
+
     try {
-      const result = await criarPedido()
+      const result = await criarPedido({
+        cliente: nome,
+        tipoEntrega: tipoEntrega,
+        endereco: tipoEntrega === 'entrega' ? endereco : undefined,
+        formaPagamento: formaPagamento,
+        troco: formaPagamento === 'dinheiro' ? troco : undefined,
+      })
+
       if (!result) {
-        setError('Falha ao criar pedido')
+        setErrorPedido('Falha ao criar pedido')
       }
     } catch (err) {
-      setError((err as Error).message || String(err))
+      setErrorPedido((err as Error).message)
     } finally {
-      setLoading(false)
+      setLoadingPedido(false)
     }
   }
 
@@ -29,23 +43,123 @@ export default function Cardapio(): JSX.Element {
   return (
     <main>
       <h1>Cardápio</h1>
-      <p>Itens no carrinho: {items.length}</p>
+
+      {/* CARDÁPIO */}
+      {carregandoCardapio && <p>Carregando cardápio...</p>}
+      {erroCardapio && <p>Erro ao carregar cardápio</p>}
+
+      <section>
+        {itens.map((item) => (
+          <div key={item.id} style={{ borderBottom: '1px solid #ccc', padding: 8 }}>
+            <strong>{item.nome}</strong>
+            <p>R$ {item.preco.toFixed(2)}</p>
+
+            <button
+              onClick={() =>
+                add({
+                  id: String(item.id),
+                  name: item.nome,
+                  price: Number(item.preco),
+                  qty: 1,
+                })
+              }
+            >
+              Adicionar
+            </button>
+          </div>
+        ))}
+      </section>
+
+      <hr />
+
+      {/* CARRINHO */}
+      <h2>Carrinho</h2>
+
+      <input
+        placeholder="Seu nome"
+        value={nome}
+        onChange={(e) => setNome(e.target.value)}
+      />
+
+      <div>
+        <label>
+          <input
+            type="radio"
+            checked={tipoEntrega === 'retirada'}
+            onChange={() => setTipoEntrega('retirada')}
+          />
+          Retirada
+        </label>
+
+        <label>
+          <input
+            type="radio"
+            checked={tipoEntrega === 'entrega'}
+            onChange={() => setTipoEntrega('entrega')}
+          />
+          Entrega
+        </label>
+      </div>
+
+      {tipoEntrega === 'entrega' && (
+        <input
+          placeholder="Endereço"
+          value={endereco}
+          onChange={(e) => setEndereco(e.target.value)}
+        />
+      )}
+
+      <div>
+        <label>
+          <input
+            type="radio"
+            checked={formaPagamento === 'dinheiro'}
+            onChange={() => setFormaPagamento('dinheiro')}
+          />
+          Dinheiro
+        </label>
+
+        <label>
+          <input
+            type="radio"
+            checked={formaPagamento === 'cartao'}
+            onChange={() => setFormaPagamento('cartao')}
+          />
+          Cartão
+        </label>
+
+        <label>
+          <input
+            type="radio"
+            checked={formaPagamento === 'pix'}
+            onChange={() => setFormaPagamento('pix')}
+          />
+          Pix
+        </label>
+      </div>
+
+      {formaPagamento === 'dinheiro' && (
+        <input
+          placeholder="Troco para quanto?"
+          value={troco}
+          onChange={(e) => setTroco(e.target.value)}
+        />
+      )}
+
       <ul>
-        {items.map((it) => (
-          <li key={it.id}>
-            {it.name} x{it.qty} — R$ {Number(it.price * it.qty).toFixed(2)}
+        {items.map((it, idx) => (
+          <li key={`${it.id}-${idx}`}>
+            {it.name} x{it.qty} — R$ {(it.price * it.qty).toFixed(2)}
           </li>
         ))}
       </ul>
 
-      <div>
-        <strong>Total: R$ {total.toFixed(2)}</strong>
-      </div>
+      <strong>Total: R$ {total.toFixed(2)}</strong>
 
-      {error && <div style={{ color: 'red' }}>{error}</div>}
+      {errorPedido && <p style={{ color: 'red' }}>{errorPedido}</p>}
 
-      <button onClick={handleSubmit} disabled={loading || items.length === 0}>
-        {loading ? 'Enviando...' : 'Finalizar Pedido'}
+      <button onClick={handleSubmit} disabled={loadingPedido || items.length === 0}>
+        {loadingPedido ? 'Enviando...' : 'Finalizar Pedido'}
       </button>
     </main>
   )
