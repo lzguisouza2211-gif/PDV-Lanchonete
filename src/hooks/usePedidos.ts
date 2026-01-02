@@ -3,7 +3,7 @@ import pedidosService, { Pedido } from '../services/api/pedidos.service'
 
 type UsePedidosReturn = {
   listPedidos: () => Promise<Pedido[]>
-  criarPedido: (p: Omit<Pedido, 'id'>) => Promise<Pedido | null>
+  criarPedido: (p: Omit<Pedido, 'id'>) => Promise<boolean>
   atualizarStatus: (id: number, status: string) => Promise<boolean>
   loading: boolean
   error: Error | null
@@ -17,8 +17,7 @@ export function usePedidos(): UsePedidosReturn {
     setLoading(true)
     setError(null)
     try {
-      const data = await pedidosService.list()
-      return data
+      return await pedidosService.list()
     } catch (err: any) {
       setError(err instanceof Error ? err : new Error(String(err)))
       return []
@@ -27,33 +26,37 @@ export function usePedidos(): UsePedidosReturn {
     }
   }, [])
 
-  const criarPedido = useCallback(async (p: Omit<Pedido, 'id'>): Promise<Pedido | null> => {
-    setLoading(true)
-    setError(null)
-    try {
-      const created = await pedidosService.create(p)
-      return created
-    } catch (err: any) {
-      setError(err instanceof Error ? err : new Error(String(err)))
-      return null
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const criarPedido = useCallback(
+    async (p: Omit<Pedido, 'id'>): Promise<boolean> => {
+      setLoading(true)
+      setError(null)
+      try {
+        return await pedidosService.create(p)
+      } catch (err: any) {
+        setError(err instanceof Error ? err : new Error(String(err)))
+        return false
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
+  )
 
-  const atualizarStatus = useCallback(async (id: number, status: string): Promise<boolean> => {
-    setLoading(true)
-    setError(null)
-    try {
-      const ok = await pedidosService.updateStatus(id, status)
-      return ok
-    } catch (err: any) {
-      setError(err instanceof Error ? err : new Error(String(err)))
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const atualizarStatus = useCallback(
+    async (id: number, status: string): Promise<boolean> => {
+      setLoading(true)
+      setError(null)
+      try {
+        return await pedidosService.updateStatus(id, status)
+      } catch (err: any) {
+        setError(err instanceof Error ? err : new Error(String(err)))
+        return false
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
+  )
 
   return { listPedidos, criarPedido, atualizarStatus, loading, error }
 }

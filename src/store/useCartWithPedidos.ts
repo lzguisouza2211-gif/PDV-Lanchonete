@@ -21,13 +21,7 @@ export function useCartWithPedidos() {
       throw new Error('Carrinho vazio')
     }
 
-    const { data, error } = await supabase.auth.getUser()
-    if (error || !data.user) {
-      throw new Error('Usuário não autenticado')
-    }
-
     const pedido = {
-      user_id: data.user.id,
       cliente: input.cliente,
       tipoentrega: input.tipoEntrega ?? null,
       endereco: input.endereco ?? null,

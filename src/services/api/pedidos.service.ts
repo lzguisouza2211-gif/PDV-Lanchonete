@@ -49,10 +49,10 @@ export const pedidosService = {
     return data as Pedido;
   },
 
-  async create(pedido: Omit<Pedido, 'id'>): Promise<Pedido | null> {
+  async create(pedido: Omit<Pedido, 'id'>): Promise<boolean> {
     if (!hasSupabase) {
       logger.warn('supabase not initialized - pedidosService.create no-op');
-      return null;
+      return false;
     }
 
     const payload = {
@@ -65,17 +65,15 @@ export const pedidosService = {
       formapagamento: pedido.formapagamento ?? null,
       troco: pedido.troco ?? null,
     };
-    const { data, error } = await (supabase as any)
+    const { error } = await (supabase as any)
       .from('pedidos')
       .insert([payload])
-      .select()
-      .single();
 
     if (error) {
       logger.error('pedidosService.create supabase error', error);
-      return null;
+      return false;
     }
-    return data as Pedido;
+    return true;
   },
 
   async updateStatus(id: number, status: string): Promise<boolean> {
