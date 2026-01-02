@@ -1,0 +1,11 @@
+/* Arquivo global de estilos (corrijir/mesclar com arquivos existentes)
+   Por enquanto contém estilos mínimos; migrar CSS componentes aqui mais tarde. */
+:root {
+  --primary: #1e3a8a;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  margin: 0;
+  padding: 0;
+}
