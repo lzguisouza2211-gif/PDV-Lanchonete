@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../../services/supabaseClient'
 import { Pedido } from '../../services/api/pedidos.service'
 import { usePedidos } from '../../hooks/usePedidos'
@@ -7,38 +7,56 @@ export default function Admin() {
   const { listPedidos, atualizarStatus, loading, error } = usePedidos()
   const [pedidos, setPedidos] = useState<Pedido[]>([])
 
+  const statusStyle: Record<string, string> = {
+    Recebido: '#fff3cd',
+    'Em preparo': '#cfe2ff',
+    Finalizado: '#d1e7dd',
+  }
+
+  // carga inicial
   useEffect(() => {
-    const load = async () => {
-      const data = await listPedidos()
-      setPedidos(data)
-    }
-    load()
+    listPedidos().then(setPedidos)
   }, [listPedidos])
 
+  // realtime DO ADMIN (já autenticado)
   useEffect(() => {
     const channel = supabase
-      .channel('admin-pedidos')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, 
+      .channel('admin-pedidos-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'pedidos' },
         (payload) => {
-          const novoPedido = payload.new as Pedido
-          setPedidos((prev) => [novoPedido, ...prev])
+          const novo = payload.new as Pedido
+
+          setPedidos((prev) => {
+            if (prev.some((p) => p.id === novo.id)) return prev
+            return [novo, ...prev]
+          })
+
+          // 🔊 som
+          const audio = new Audio('/notification.mp3')
+          audio.play().catch(() => {})
         }
       )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' },
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'pedidos' },
         (payload) => {
-          const pedidoAtualizado = payload.new as Pedido
+          const atualizado = payload.new as Pedido
           setPedidos((prev) =>
-            prev.map((p) => (p.id === pedidoAtualizado.id ? pedidoAtualizado : p))
+            prev.map((p) => (p.id === atualizado.id ? atualizado : p))
           )
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('📡 Realtime admin status:', status)
+      })
 
     return () => {
       supabase.removeChannel(channel)
     }
   }, [])
-  
+
   if (loading) return <p>Carregando pedidos...</p>
   if (error) return <p>Erro ao carregar pedidos</p>
 
@@ -47,7 +65,16 @@ export default function Admin() {
       <h1>Pedidos</h1>
 
       {pedidos.map((pedido) => (
-        <div key={pedido.id} style={{ borderBottom: '1px solid #ccc', marginBottom: 12 }}>
+        <div
+          key={pedido.id}
+          style={{
+            backgroundColor: statusStyle[pedido.status ?? 'Recebido'],
+            padding: 12,
+            borderRadius: 6,
+            marginBottom: 12,
+            border: '1px solid #ccc',
+          }}
+        >
           <p><strong>Cliente:</strong> {pedido.cliente}</p>
           <p><strong>Total:</strong> R$ {pedido.total}</p>
           <p><strong>Status:</strong> {pedido.status}</p>
@@ -55,7 +82,6 @@ export default function Admin() {
           <button onClick={() => atualizarStatus(pedido.id, 'Em preparo')}>
             Em preparo
           </button>
-
           <button onClick={() => atualizarStatus(pedido.id, 'Finalizado')}>
             Finalizado
           </button>
