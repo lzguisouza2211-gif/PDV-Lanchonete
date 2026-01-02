@@ -1,14 +1,18 @@
-import React from 'react'
+import { Navigate } from 'react-router-dom'
+import { useAdminAuth } from '../../hooks/useAdminAuth'
 
-// Stub de PrivateRoute — integra com store de usuário futuramente
-type Props = { children: React.ReactNode; role?: string }
+type Props = {
+  children: JSX.Element
+}
 
 export default function PrivateRoute({ children }: Props) {
-  // Nota: durante migração não há auth; este componente já define o ponto
-  // onde integrar Supabase Auth/roles. Por enquanto, bloqueia por padrão.
-  const allowed = false // mudar para checagem real com useUser() da store
-  if (!allowed) {
-    return <div>Acesso restrito — rota protegida</div>
+  const { loading, isAdmin } = useAdminAuth()
+
+  if (loading) return <p>Verificando acesso...</p>
+
+  if (!isAdmin) {
+    return <Navigate to="/admin/login" replace />
   }
-  return children as JSX.Element
+
+  return children
 }
