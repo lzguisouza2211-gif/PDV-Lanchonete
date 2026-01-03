@@ -15,6 +15,8 @@ export type Pedido = {
   endereco?: string;
   formapagamento?: string;
   troco?: string | number;
+  created_at?: string;
+  updated_at?: string;
 };
 
 const hasSupabase = (supabase as any) && typeof (supabase as any).from === 'function';
