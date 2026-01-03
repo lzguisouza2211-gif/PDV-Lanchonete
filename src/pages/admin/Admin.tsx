@@ -1,92 +1,102 @@
-import { useEffect, useState } from 'react'
-import { supabase } from '../../services/supabaseClient'
+import { useEffect } from 'react'
 import { Pedido } from '../../services/api/pedidos.service'
 import { usePedidos } from '../../hooks/usePedidos'
+import { usePedidosStore } from '../../store/usePedidosStore'
+
+const STATUS_COLUNAS = ['Recebido', 'Em preparo', 'Finalizado'] as const
 
 export default function Admin() {
   const { listPedidos, atualizarStatus, loading, error } = usePedidos()
-  const [pedidos, setPedidos] = useState<Pedido[]>([])
+  const { pedidos, setPedidos } = usePedidosStore()
 
-  const statusStyle: Record<string, string> = {
-    Recebido: '#fff3cd',
-    'Em preparo': '#cfe2ff',
-    Finalizado: '#d1e7dd',
-  }
-
-  // carga inicial
   useEffect(() => {
-    listPedidos().then(setPedidos)
-  }, [listPedidos])
-
-  // realtime DO ADMIN (já autenticado)
-  useEffect(() => {
-    const channel = supabase
-      .channel('admin-pedidos-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pedidos' },
-        (payload) => {
-          const novo = payload.new as Pedido
-
-          setPedidos((prev) => {
-            if (prev.some((p) => p.id === novo.id)) return prev
-            return [novo, ...prev]
-          })
-
-          // 🔊 som
-          const audio = new Audio('/notification.mp3')
-          audio.play().catch(() => {})
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'pedidos' },
-        (payload) => {
-          const atualizado = payload.new as Pedido
-          setPedidos((prev) =>
-            prev.map((p) => (p.id === atualizado.id ? atualizado : p))
-          )
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 Realtime admin status:', status)
-      })
-
-    return () => {
-      supabase.removeChannel(channel)
+    const load = async () => {
+      const data = await listPedidos()
+      setPedidos(data)
     }
-  }, [])
+    load()
+  }, [listPedidos, setPedidos])
 
   if (loading) return <p>Carregando pedidos...</p>
   if (error) return <p>Erro ao carregar pedidos</p>
 
   return (
-    <main>
-      <h1>Pedidos</h1>
+    <main style={{ padding: 16 }}>
+      <h1>Painel de Pedidos</h1>
 
-      {pedidos.map((pedido) => (
-        <div
-          key={pedido.id}
-          style={{
-            backgroundColor: statusStyle[pedido.status ?? 'Recebido'],
-            padding: 12,
-            borderRadius: 6,
-            marginBottom: 12,
-            border: '1px solid #ccc',
-          }}
-        >
-          <p><strong>Cliente:</strong> {pedido.cliente}</p>
-          <p><strong>Total:</strong> R$ {pedido.total}</p>
-          <p><strong>Status:</strong> {pedido.status}</p>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 16,
+          marginTop: 16,
+        }}
+      >
+        {STATUS_COLUNAS.map((status) => (
+          <div
+            key={status}
+            style={{
+              background: '#f8f9fa',
+              padding: 12,
+              borderRadius: 8,
+              minHeight: 400,
+            }}
+          >
+            <h2 style={{ textAlign: 'center' }}>{status}</h2>
 
-          <button onClick={() => atualizarStatus(pedido.id, 'Em preparo')}>
+            {pedidos
+              .filter((p) => (p.status ?? 'Recebido') === status)
+              .map((pedido) => (
+                <PedidoCard
+                  key={pedido.id}
+                  pedido={pedido}
+                  onChangeStatus={atualizarStatus}
+                />
+              ))}
+          </div>
+        ))}
+      </div>
+    </main>
+  )
+}
+
+/* =========================
+   CARD DO PEDIDO
+========================= */
+function PedidoCard({
+  pedido,
+  onChangeStatus,
+}: {
+  pedido: Pedido
+  onChangeStatus: (id: number, status: string) => Promise<boolean>
+}) {
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: '1px solid #ccc',
+        borderRadius: 6,
+        padding: 12,
+        marginBottom: 12,
+      }}
+    >
+      <p><strong>Cliente:</strong> {pedido.cliente}</p>
+      <p><strong>Total:</strong> R$ {pedido.total}</p>
+      <p><strong>Status:</strong> {pedido.status}</p>
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        {pedido.status !== 'Em preparo' && (
+          <button onClick={() => onChangeStatus(pedido.id, 'Em preparo')}>
             Em preparo
           </button>
-          <button onClick={() => atualizarStatus(pedido.id, 'Finalizado')}>
-            Finalizado
+        )}
+
+        {pedido.status !== 'Finalizado' && (
+          <button onClick={() => onChangeStatus(pedido.id, 'Finalizado')}>
+            Finalizar
           </button>
-        </div>
-      ))}
-    </main>
+        )}
+      </div>
+    </div>
   )
 }
