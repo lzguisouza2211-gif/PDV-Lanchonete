@@ -11,6 +11,7 @@ import { supabase } from '../../services/supabaseClient'
 
 const COLUMNS = [
   { id: 'Recebido', title: 'Recebido', color: '#fff3cd' },
+  { id: 'confirmação', title: 'Confirmação', color: '#d1ecf1' },
   { id: 'Em preparo', title: 'Em preparo', color: '#cfe2ff' },
   { id: 'Finalizado', title: 'Finalizado', color: '#d1e7dd' },
 ]
@@ -84,6 +85,8 @@ export default function Admin() {
     // regras
     if (origem === 'Finalizado') return
     if (origem === 'Recebido' && destino === 'Finalizado') return
+    if (origem === 'Recebido' && destino === 'Finalizado') return
+    if (origem === 'Confirmação' && destino === 'Recebido') return
 
     const pedidoId = Number(draggableId)
 
