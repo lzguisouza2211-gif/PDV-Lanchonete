@@ -18,23 +18,20 @@ export function useAdminAuth() {
 
         const userId = sessionData.session.user.id
 
-        const { data: admin, error: adminError } = await supabase
+        const { data: admin, error } = await supabase
           .from('admins')
           .select('id')
           .eq('user_id', userId)
           .eq('ativo', true)
           .maybeSingle()
 
-        if (adminError) {
-          console.error('Erro ao verificar admin:', adminError)
+        if (error) {
+          console.error('Erro ao verificar admin:', error)
           setIsAdmin(false)
           return
         }
 
         setIsAdmin(!!admin)
-      } catch (err) {
-        console.error('Erro inesperado ao verificar admin:', err)
-        setIsAdmin(false)
       } finally {
         setLoading(false)
       }
