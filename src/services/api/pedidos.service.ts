@@ -61,7 +61,7 @@ export const pedidosService = {
       .insert([pedido])
 
     if (error) {
-      logger.error(error)
+      console.error('Erro Supabase:', error)
       return false
     }
 

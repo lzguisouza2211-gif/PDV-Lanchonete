@@ -8,6 +8,10 @@ let _supabase: SupabaseClient | any = null
 if (url && key) {
 	_supabase = createClient(url, key)
 }
+if (!url || !key) {
+	throw new Error('Supabase env vars not found')
+}
 
-export const supabase = _supabase
+
+export const supabase = createClient(url, key)
 
