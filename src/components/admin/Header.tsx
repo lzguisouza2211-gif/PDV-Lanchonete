@@ -1,47 +1,43 @@
+import { useState } from 'react'
+
 export default function Header() {
-  const aberto = true // depois ligamos isso ao banco
+  const [aberto, setAberto] = useState(true)
 
   return (
     <header
       style={{
         background: '#fff',
-        borderBottom: '1px solid #e5e7eb',
-        padding: '14px 24px',
+        borderBottom: '1px solid #e5e5e5',
+        padding: '12px 24px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
       }}
     >
-      {/* Esquerda */}
-      <div>
-        <h2 style={{ margin: 0, fontSize: 18 }}>Luizão Lanches</h2>
-        <span style={{ fontSize: 12, color: '#666' }}>
-          Painel Administrativo
-        </span>
-      </div>
+      {/* TÍTULO */}
+      <strong style={{ fontSize: 18 }}>Painel Administrativo</strong>
 
-      {/* Direita */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div
+      {/* AÇÕES */}
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+        <span
           style={{
-            padding: '6px 12px',
-            borderRadius: 20,
-            fontSize: 13,
+            fontSize: 14,
+            color: aberto ? '#28a745' : '#dc3545',
             fontWeight: 600,
-            background: aberto ? '#e6f4ea' : '#fdecea',
-            color: aberto ? '#1e7e34' : '#a71d2a',
           }}
         >
           {aberto ? 'Aberto' : 'Fechado'}
-        </div>
+        </span>
 
         <button
+          onClick={() => setAberto(!aberto)}
           style={{
             padding: '6px 14px',
-            borderRadius: 8,
+            borderRadius: 20,
             border: 'none',
-            background: aberto ? '#dc3545' : '#28a745',
+            background: aberto ? '#28a745' : '#6c757d',
             color: '#fff',
+            fontWeight: 600,
             cursor: 'pointer',
           }}
         >

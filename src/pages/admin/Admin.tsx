@@ -6,7 +6,7 @@ import {
 } from '@hello-pangea/dnd'
 
 import { Pedido } from '../../services/api/pedidos.service'
-import { usePedidos } from '../../hooks/usePedidos'
+import  usePedidos  from '../../hooks/usePedidos'
 import { supabase } from '../../services/supabaseClient'
 
 const COLUMNS = [
@@ -34,43 +34,46 @@ export default function Admin() {
     load()
   }, [listPedidos])
 
+  /* =======================
+     REALTIME
+  ======================= */
   useEffect(() => {
-  const channel = supabase
-    .channel('admin-pedidos-realtime')
+    const channel = supabase
+      .channel('admin-pedidos-realtime')
 
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'pedidos' },
-      (payload) => {
-        const novo = payload.new as Pedido
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'pedidos' },
+        (payload) => {
+          const novo = payload.new as Pedido
 
-        setPedidos((prev) => {
-          if (prev.some((p) => p.id === novo.id)) return prev
-          return [novo, ...prev]
-        })
-      }
-    )
+          setPedidos((prev) => {
+            if (prev.some((p) => p.id === novo.id)) return prev
+            return [novo, ...prev]
+          })
+        }
+      )
 
-    .on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'pedidos' },
-      (payload) => {
-        const atualizado = payload.new as Pedido
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'pedidos' },
+        (payload) => {
+          const atualizado = payload.new as Pedido
 
-        setPedidos((prev) =>
-          prev.map((p) =>
-            p.id === atualizado.id ? atualizado : p
+          setPedidos((prev) =>
+            prev.map((p) =>
+              p.id === atualizado.id ? atualizado : p
+            )
           )
-        )
-      }
-    )
+        }
+      )
 
-    .subscribe()
+      .subscribe()
 
-  return () => {
-    supabase.removeChannel(channel)
-  }
-}, [])
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
 
   /* =======================
      DRAG END
@@ -85,8 +88,7 @@ export default function Admin() {
     // regras
     if (origem === 'Finalizado') return
     if (origem === 'Recebido' && destino === 'Finalizado') return
-    if (origem === 'Recebido' && destino === 'Finalizado') return
-    if (origem === 'Confirmação' && destino === 'Recebido') return
+    if (origem === 'confirmação' && destino === 'Recebido') return
 
     const pedidoId = Number(draggableId)
 
@@ -103,6 +105,8 @@ export default function Admin() {
   if (loading) return <p>Carregando pedidos...</p>
   if (error) return <p>Erro ao carregar pedidos</p>
 
+  const hoje = new Date().toISOString().slice(0, 10)
+
   return (
     <main style={{ padding: 24, background: '#f4f5f7', minHeight: '100vh' }}>
       <h1 style={{ marginBottom: 24 }}>Painel de Pedidos</h1>
@@ -110,9 +114,18 @@ export default function Admin() {
       <DragDropContext onDragEnd={onDragEnd}>
         <div style={{ display: 'flex', gap: 20 }}>
           {COLUMNS.map((col) => {
-            const pedidosColuna = pedidos.filter(
+            let pedidosColuna = pedidos.filter(
               (p) => (p.status ?? 'Recebido') === col.id
             )
+
+            // 🔒 Finalizados: só hoje + limite visual
+            if (col.id === 'Finalizado') {
+              pedidosColuna = pedidosColuna
+                .filter((p: any) =>
+                  p.created_at?.startsWith(hoje)
+                )
+                .slice(0, 20)
+            }
 
             return (
               <Droppable droppableId={col.id} key={col.id}>
@@ -134,6 +147,14 @@ export default function Admin() {
 
                     {pedidosColuna.map((pedido, index) => {
                       const bloqueado = pedido.status === 'Finalizado'
+                      const hora = (pedido as any).created_at
+                        ? new Date(
+                            (pedido as any).created_at
+                          ).toLocaleTimeString('pt-BR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : '--:--'
 
                       return (
                         <Draggable
@@ -162,11 +183,36 @@ export default function Admin() {
                                 ...provided.draggableProps.style,
                               }}
                             >
-                              <p style={{ fontWeight: 600 }}>
+                              <div style={{ fontWeight: 600 }}>
                                 {pedido.cliente}
-                              </p>
-                              <p>Total: R$ {pedido.total}</p>
-                              <small>#{pedido.id}</small>
+                              </div>
+
+                              <div style={{ fontSize: 13, marginTop: 4 }}>
+                                📦 {pedido.tipoentrega ?? 'retirada'}
+                              </div>
+
+                              <div style={{ fontSize: 13 }}>
+                                💳 {pedido.formapagamento ?? '-'}
+                              </div>
+
+                              <div style={{ marginTop: 6 }}>
+                                <strong>
+                                  R$ {pedido.total.toFixed(2)}
+                                </strong>
+                              </div>
+
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  marginTop: 6,
+                                  fontSize: 12,
+                                  color: '#555',
+                                }}
+                              >
+                                <span>🕒 {hora}</span>
+                                <span>#{pedido.id}</span>
+                              </div>
                             </div>
                           )}
                         </Draggable>
@@ -211,54 +257,23 @@ export default function Admin() {
             }}
           >
             <h2>Pedido #{pedidoSelecionado.id}</h2>
-
-            <p><strong>Cliente:</strong> {pedidoSelecionado.cliente}</p>
-            <p><strong>Status:</strong> {pedidoSelecionado.status}</p>
-            <p><strong>Total:</strong> R$ {pedidoSelecionado.total}</p>
-
-            {pedidoSelecionado.tipoentrega && (
-              <p>
-                <strong>Entrega:</strong> {pedidoSelecionado.tipoentrega}
-              </p>
-            )}
-
-            {pedidoSelecionado.endereco && (
-              <p>
-                <strong>Endereço:</strong> {pedidoSelecionado.endereco}
-              </p>
-            )}
-
-            {pedidoSelecionado.formapagamento && (
-              <p>
-                <strong>Pagamento:</strong>{' '}
-                {pedidoSelecionado.formapagamento}
-              </p>
-            )}
-
-            {pedidoSelecionado.troco && (
-              <p>
-                <strong>Troco:</strong> R$ {pedidoSelecionado.troco}
-              </p>
-            )}
-
             <h3 style={{ marginTop: 16 }}>Itens</h3>
             <ul>
               {pedidoSelecionado.itens.map((item, idx) => (
                 <li key={idx}>
                   {item.nome} – R$ {item.preco}
-                  {item.adicionais && item.adicionais.length > 0 && (
-                    <ul>
-                      {item.adicionais.map((ad, i) => (
-                        <li key={i}>
-                          + {ad.nome} (R$ {ad.preco})
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                 </li>
               ))}
             </ul>
-
+            <p><strong>Cliente:</strong> {pedidoSelecionado.cliente}</p>
+            <p><strong>Tipo de Entrega:</strong> {pedidoSelecionado.tipoentrega}</p>
+              {pedidoSelecionado.tipoentrega === 'entrega' && (
+              <p><strong>Endereço:</strong> {pedidoSelecionado.endereco}</p>
+            )}
+            <p><strong>Total:</strong> R$ {pedidoSelecionado.total}</p>
+            <p><strong>Forma de Pagamento:</strong> {pedidoSelecionado.formapagamento}</p>
+             
+            <p><strong>Troco:</strong> R$ {pedidoSelecionado.troco}</p>
             <button
               style={{ marginTop: 16 }}
               onClick={() => setPedidoSelecionado(null)}
@@ -271,3 +286,4 @@ export default function Admin() {
     </main>
   )
 }
+

@@ -228,6 +228,51 @@ export default function Cardapio(): JSX.Element {
               style={{ width: '100%', marginTop: 12 }}
             />
 
+            <select
+              value={tipoEntrega}
+              onChange={(e) =>
+                setTipoEntrega(
+                  e.target.value as 'retirada' | 'entrega'
+                )
+              }
+              style={{ width: '100%', marginTop: 12 }}
+            >
+              <option value="retirada">Retirada</option>
+              <option value="entrega">Entrega</option>
+            </select>
+
+            {tipoEntrega === 'entrega' && (
+              <input
+                placeholder="Endereço de entrega"
+                value={endereco}
+                onChange={(e) => setEndereco(e.target.value)}
+                style={{ width: '100%', marginTop: 12 }}
+              />
+            )}
+
+            <select
+              value={formaPagamento}
+              onChange={(e) =>
+                setFormaPagamento(
+                  e.target.value as 'dinheiro' | 'cartao' | 'pix'
+                )
+              }
+              style={{ width: '100%', marginTop: 12 }}
+            >
+              <option value="dinheiro">Dinheiro</option>
+              <option value="cartao">Cartão</option>
+              <option value="pix">PIX</option>
+            </select>
+
+            {formaPagamento === 'dinheiro' && (
+              <input
+                placeholder="Troco para quanto?"
+                value={troco}
+                onChange={(e) => setTroco(e.target.value)}
+                style={{ width: '100%', marginTop: 12 }}
+              />
+            )}
+
             <button
               onClick={finalizar}
               disabled={enviando}

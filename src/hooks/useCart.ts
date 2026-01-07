@@ -1,5 +1,5 @@
 import create from 'zustand'
-import { usePedidos } from '../hooks/usePedidos'
+import  usePedidos  from '../hooks/usePedidos'
 
 /* =======================
    TIPOS

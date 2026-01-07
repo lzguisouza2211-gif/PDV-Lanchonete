@@ -1,6 +1,5 @@
 import { useCart } from './useCart'
-import { usePedidos } from '../hooks/usePedidos'
-import { supabase } from '../services/supabaseClient'
+import usePedidos from '../hooks/usePedidos'
 
 export function useCartWithPedidos() {
   const cart = useCart()
@@ -13,7 +12,7 @@ export function useCartWithPedidos() {
     formaPagamento?: string
     troco?: number | string
   }) {
-    if (!input.cliente || input.cliente.trim() === '') {
+    if (!input.cliente) {
       throw new Error('Nome do cliente é obrigatório')
     }
 
@@ -26,7 +25,7 @@ export function useCartWithPedidos() {
       tipoentrega: input.tipoEntrega ?? null,
       endereco: input.endereco ?? null,
       formapagamento: input.formaPagamento ?? null,
-      troco: input.troco ? Number(input.troco) : null,
+      troco: input.troco ?? null,
       status: 'Recebido',
       total: cart.items.reduce(
         (s, i) => s + i.price * i.qty,
@@ -35,7 +34,7 @@ export function useCartWithPedidos() {
       itens: cart.items.map((item) => ({
         nome: item.name,
         preco: item.price,
-        quantidade: item.qty,
+        adicionais: [], // ✅ formato esperado pelo banco
       })),
     }
 
@@ -43,11 +42,12 @@ export function useCartWithPedidos() {
 
     const criado = await criarPedidoService(pedido)
 
-    if (criado) {
-      cart.clear()
+    if (!criado) {
+      throw new Error('Erro ao enviar pedido')
     }
 
-    return criado
+    cart.clear()
+    return true
   }
 
   return {
