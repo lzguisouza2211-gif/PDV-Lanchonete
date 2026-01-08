@@ -44,7 +44,7 @@ export default function Login() {
     }
 
     // 3️⃣ Sucesso → admin
-    navigate('/Admin')
+    navigate('/Admin/dashboard')
   }
 
   return (
