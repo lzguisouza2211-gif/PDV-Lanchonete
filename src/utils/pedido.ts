@@ -13,7 +13,13 @@ export type PedidoPayload = {
     nome: string
     preco: number
     quantidade: number
-    adicionais: any[]
+    adicionais?: any[]
+    observacoes?: string
+    extras?: Array<{
+      nome: string
+      preco: number
+      tipo: 'add' | 'remove'
+    }>
   }>
 }
 
@@ -41,8 +47,14 @@ export function normalizePedidoPayload(
     throw new Error('Carrinho vazio')
   }
 
-  // Calcula total
-  const total = items.reduce((sum, item) => sum + item.price * item.qty, 0)
+  // Calcula total incluindo extras
+  const total = items.reduce((sum, item) => {
+    const precoBase = item.price
+    const precoExtras = (item.extras || []).reduce((extraSum, extra) => {
+      return extraSum + (extra.tipo === 'add' ? extra.preco : 0)
+    }, 0)
+    return sum + (precoBase + precoExtras) * item.qty
+  }, 0)
 
   if (total <= 0) {
     throw new Error('Total do pedido deve ser maior que zero')
@@ -82,6 +94,8 @@ export function normalizePedidoPayload(
       preco: Number(item.price),
       quantidade: Number(item.qty),
       adicionais: [],
+      observacoes: item.observacoes || undefined,
+      extras: item.extras || undefined,
     })),
   }
 }

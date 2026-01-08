@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useStoreStatus } from '../../hooks/useStoreStatus'
 
 export default function Header() {
-  const [aberto, setAberto] = useState(true)
+  const { isOpen, loading, toggleStatus } = useStoreStatus()
+  const [toggling, setToggling] = useState(false)
   const agora = new Date()
   const dataFormatada = agora.toLocaleDateString('pt-BR', {
     weekday: 'long',
@@ -9,6 +11,12 @@ export default function Header() {
     month: 'long',
     day: 'numeric',
   })
+
+  const handleToggle = async () => {
+    setToggling(true)
+    await toggleStatus(!isOpen)
+    setToggling(false)
+  }
 
   return (
     <header
@@ -49,65 +57,90 @@ export default function Header() {
 
       {/* AÇÕES */}
       <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 16px',
-            borderRadius: 20,
-            background: aberto ? '#f0fdf4' : '#fef2f2',
-            border: `1px solid ${aberto ? '#bbf7d0' : '#fecaca'}`,
-          }}
-        >
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: aberto ? '#22c55e' : '#ef4444',
-              display: 'block',
-              animation: aberto ? 'pulse 2s infinite' : 'none',
-            }}
-          />
-          <span
-            style={{
-              fontSize: 14,
-              color: aberto ? '#166534' : '#991b1b',
-              fontWeight: 600,
-            }}
-          >
-            {aberto ? 'Aberto' : 'Fechado'}
-          </span>
-        </div>
+        {!loading && (
+          <>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 16px',
+                borderRadius: 20,
+                background: isOpen ? '#f0fdf4' : '#fef2f2',
+                border: `1px solid ${isOpen ? '#bbf7d0' : '#fecaca'}`,
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: isOpen ? '#22c55e' : '#ef4444',
+                  display: 'block',
+                  animation: isOpen ? 'pulse 2s infinite' : 'none',
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 14,
+                  color: isOpen ? '#166534' : '#991b1b',
+                  fontWeight: 600,
+                }}
+              >
+                {isOpen ? 'Aberto' : 'Fechado'}
+              </span>
+            </div>
 
-        <button
-          onClick={() => setAberto(!aberto)}
-          style={{
-            padding: '10px 20px',
-            borderRadius: 12,
-            border: 'none',
-            background: aberto
-              ? 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)'
-              : 'linear-gradient(135deg, #28a745 0%, #218838 100%)',
-            color: '#fff',
-            fontWeight: 600,
-            fontSize: 14,
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            boxShadow: `0 2px 8px rgba(${aberto ? '220, 53, 69' : '40, 167, 69'}, 0.3)`,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)'
-            e.currentTarget.style.boxShadow = `0 4px 12px rgba(${aberto ? '220, 53, 69' : '40, 167, 69'}, 0.4)`
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = `0 2px 8px rgba(${aberto ? '220, 53, 69' : '40, 167, 69'}, 0.3)`
-          }}
-        >
-          {aberto ? '🔴 Fechar' : '🟢 Abrir'}
-        </button>
+            <label
+              style={{
+                position: 'relative',
+                display: 'inline-block',
+                width: 56,
+                height: 30,
+                cursor: toggling ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={isOpen}
+                onChange={handleToggle}
+                disabled={toggling || loading}
+                style={{
+                  opacity: 0,
+                  width: 0,
+                  height: 0,
+                }}
+              />
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: isOpen ? '#27ae60' : '#e74c3c',
+                  borderRadius: 30,
+                  transition: 'background 0.3s ease',
+                  opacity: toggling ? 0.6 : 1,
+                }}
+              >
+                <span
+                  style={{
+                    position: 'absolute',
+                    height: 24,
+                    width: 24,
+                    left: isOpen ? 28 : 3,
+                    bottom: 3,
+                    background: '#fff',
+                    borderRadius: '50%',
+                    transition: 'left 0.3s ease',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  }}
+                />
+              </span>
+            </label>
+          </>
+        )}
       </div>
 
       <style>{`

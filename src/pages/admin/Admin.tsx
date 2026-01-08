@@ -137,6 +137,7 @@ export default function Admin() {
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
             gap: 20,
           }}
+          className="kanban-grid"
         >
           {COLUMNS.map((col) => {
             let pedidosColuna = pedidos.filter(
@@ -297,7 +298,25 @@ export default function Admin() {
                                   <div>
                                     💳 {pedido.formapagamento ?? '-'}
                                   </div>
+                                  {pedido.troco && (
+                                    <div style={{ fontSize: 12, color: '#27ae60' }}>
+                                      💵 Troco: R$ {Number(pedido.troco).toFixed(2)}
+                                    </div>
+                                  )}
                                 </div>
+                                
+                                {/* Itens com extras/observações */}
+                                {pedido.itens && pedido.itens.length > 0 && (
+                                  <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+                                    {pedido.itens.some((item: any) => 
+                                      (item.extras && item.extras.length > 0) || item.observacoes
+                                    ) && (
+                                      <div style={{ marginTop: 4 }}>
+                                        ✨ Personalizado
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
 
                                 <div
                                   style={{
@@ -371,14 +390,16 @@ export default function Admin() {
             style={{
               background: '#fff',
               borderRadius: 20,
-              padding: 32,
+              padding: 24,
               width: '100%',
               maxWidth: 600,
               maxHeight: '90vh',
               overflowY: 'auto',
               boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
               animation: 'scaleIn 0.2s ease',
+              margin: '20px',
             }}
+            className="pedido-modal"
           >
             <div
               style={{
@@ -434,38 +455,101 @@ export default function Admin() {
                 Itens
               </h3>
               <div style={{ background: '#f9fafb', borderRadius: 12, padding: 16 }}>
-                {pedidoSelecionado.itens.map((item, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      padding: '8px 0',
-                      borderBottom:
-                        idx < pedidoSelecionado.itens.length - 1
-                          ? '1px solid #e5e7eb'
-                          : 'none',
-                    }}
-                  >
-                    <span style={{ fontWeight: 500 }}>{item.nome}</span>
-                    <span style={{ color: '#666' }}>
-                      R$ {item.preco.toFixed(2)}
-                      {item.quantidade && item.quantidade > 1
-                        ? ` x${item.quantidade}`
-                        : ''}
-                    </span>
-                  </div>
-                ))}
+                {pedidoSelecionado.itens.map((item: any, idx) => {
+                  const precoBase = item.preco
+                  const precoExtras = (item.extras || []).reduce((sum: number, extra: any) => {
+                    return sum + (extra.tipo === 'add' ? extra.preco : 0)
+                  }, 0)
+                  const precoTotal = precoBase + precoExtras
+                  
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: '12px 0',
+                        borderBottom:
+                          idx < pedidoSelecionado.itens.length - 1
+                            ? '1px solid #e5e7eb'
+                            : 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, fontSize: 15 }}>{item.nome}</span>
+                        <span style={{ color: '#666', fontWeight: 600 }}>
+                          R$ {precoTotal.toFixed(2)}
+                          {item.quantidade && item.quantidade > 1
+                            ? ` x${item.quantidade}`
+                            : ''}
+                        </span>
+                      </div>
+                      
+                      {/* Extras */}
+                      {item.extras && item.extras.length > 0 && (
+                        <div style={{ marginTop: 6, marginBottom: 4 }}>
+                          {item.extras
+                            .filter((e: any) => e.tipo === 'add')
+                            .map((extra: any, eIdx: number) => (
+                              <div
+                                key={eIdx}
+                                style={{
+                                  fontSize: 12,
+                                  color: '#27ae60',
+                                  marginBottom: 2,
+                                  paddingLeft: 8,
+                                }}
+                              >
+                                + {extra.nome} (+R$ {extra.preco.toFixed(2)})
+                              </div>
+                            ))}
+                          {item.extras
+                            .filter((e: any) => e.tipo === 'remove')
+                            .map((extra: any, eIdx: number) => (
+                              <div
+                                key={eIdx}
+                                style={{
+                                  fontSize: 12,
+                                  color: '#e74c3c',
+                                  marginBottom: 2,
+                                  paddingLeft: 8,
+                                }}
+                              >
+                                - Sem {extra.nome}
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                      
+                      {/* Observações */}
+                      {item.observacoes && (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: '#666',
+                            fontStyle: 'italic',
+                            marginTop: 4,
+                            padding: 6,
+                            background: '#fff',
+                            borderRadius: 6,
+                            border: '1px solid #e0e0e0',
+                          }}
+                        >
+                          📝 {item.observacoes}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: 16,
+                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                gap: 12,
                 marginBottom: 24,
               }}
+              className="info-grid"
             >
               <InfoItem
                 label="Cliente"
@@ -487,10 +571,64 @@ export default function Admin() {
               />
               {pedidoSelecionado.troco && (
                 <InfoItem
-                  label="Troco"
+                  label="Troco para"
                   value={`R$ ${Number(pedidoSelecionado.troco).toFixed(2)}`}
                 />
               )}
+            </div>
+            
+            {/* Informações Financeiras */}
+            <div
+              style={{
+                background: '#f0f9ff',
+                borderRadius: 12,
+                padding: 16,
+                marginBottom: 24,
+                border: '1px solid #bae6fd',
+              }}
+            >
+              <h3
+                style={{
+                  margin: '0 0 12px 0',
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: '#1a1a1a',
+                }}
+              >
+                💰 Informações Financeiras
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 14, color: '#666' }}>Subtotal:</span>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>
+                    R$ {pedidoSelecionado.total.toFixed(2)}
+                  </span>
+                </div>
+                {pedidoSelecionado.troco && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 14, color: '#666' }}>Troco:</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#27ae60' }}>
+                      R$ {Number(pedidoSelecionado.troco).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                <div
+                  style={{
+                    marginTop: 8,
+                    paddingTop: 8,
+                    borderTop: '1px solid #bae6fd',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a' }}>
+                    Total a receber:
+                  </span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: '#c0392b' }}>
+                    R$ {pedidoSelecionado.total.toFixed(2)}
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div
@@ -563,6 +701,23 @@ export default function Admin() {
           to { 
             transform: scale(1);
             opacity: 1;
+          }
+        }
+        
+        @media (max-width: 768px) {
+          .pedido-modal {
+            padding: 20px !important;
+            margin: 10px !important;
+            max-height: 95vh !important;
+          }
+          
+          .info-grid {
+            grid-template-columns: 1fr !important;
+          }
+          
+          .kanban-grid {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
           }
         }
       `}</style>

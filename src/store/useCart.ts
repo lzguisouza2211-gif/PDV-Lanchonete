@@ -1,10 +1,13 @@
 import { create } from 'zustand'
+import { ExtraItem } from '../types'
 
 export type CartItem = {
   id: string
   name: string
   price: number
   qty: number
+  observacoes?: string
+  extras?: ExtraItem[]
 }
 
 type CartState = {
@@ -18,13 +21,20 @@ export const useCart = create<CartState>((set) => ({
   items: [],
   add: (item) =>
     set((state) => {
-      const existingItem = state.items.find((i) => i.id === item.id)
+      // Criar ID único baseado no produto + extras + observações para diferenciar itens customizados
+      const itemKey = `${item.id}-${JSON.stringify(item.extras || [])}-${item.observacoes || ''}`
+      const existingItem = state.items.find((i) => {
+        const iKey = `${i.id}-${JSON.stringify(i.extras || [])}-${i.observacoes || ''}`
+        return iKey === itemKey
+      })
+      
       if (existingItem) {
-        // Se item já existe, aumenta a quantidade
+        // Se item já existe com mesma customização, aumenta a quantidade
         return {
-          items: state.items.map((i) =>
-            i.id === item.id ? { ...i, qty: i.qty + (item.qty || 1) } : i
-          ),
+          items: state.items.map((i) => {
+            const iKey = `${i.id}-${JSON.stringify(i.extras || [])}-${i.observacoes || ''}`
+            return iKey === itemKey ? { ...i, qty: i.qty + (item.qty || 1) } : i
+          }),
         }
       }
       // Se não existe, adiciona novo item
