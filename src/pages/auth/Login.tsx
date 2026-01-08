@@ -39,12 +39,8 @@ export default function Login() {
       return
     }
 
-<<<<<<< HEAD
     // 3️⃣ Sucesso → admin
     navigate('/Admin/dashboard')
-=======
-    navigate('/admin/dashboard')
->>>>>>> 71a35be153a8df41a71499e0c723f0bab413268b
   }
 
   return (
