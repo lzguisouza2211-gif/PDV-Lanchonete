@@ -153,57 +153,6 @@ export default function Cardapio(): JSX.Element {
     }
   }
 
-  // Função auxiliar para extrair ingredientes da descrição
-  const extrairIngredientesDaDescricao = (descricao?: string): string[] => {
-    if (!descricao) return []
-    
-    // Palavras a ignorar
-    const palavrasIgnorar = [
-      'pao', 'pão', 'de', 'no', 'na', 'com', 'sem', 'e', 'quatro', 'ovos', 
-      'tres', 'três', 'fatias', 'frances', 'francês', 'hamburguer', 'hambúrguer', 
-      'filé', 'file', 'desfiado', 'acebolado', 'palha', 'simples', 'c/', 's/',
-      'macarrao', 'macarrão', 'molho', '200g'
-    ]
-    
-    // Normaliza e separa por vírgula ou "e"
-    let texto = descricao.toLowerCase()
-      .replace(/\s*(e|com|sem|c\/|s\/)\s*/g, ',')
-      .replace(/\s*,\s*/g, ',')
-    
-    // Separa por vírgula
-    const partes = texto.split(',')
-    
-    const ingredientes: string[] = []
-    
-    for (const parte of partes) {
-      const item = parte.trim()
-      
-      // Ignora se for muito curto ou estiver na lista de ignorar
-      if (item.length < 3 || palavrasIgnorar.includes(item)) {
-        continue
-      }
-      
-      // Remove espaços extras e capitaliza
-      const ingrediente = item
-        .split(/\s+/)
-        .map(palavra => {
-          // Se a palavra não estiver na lista de ignorar, capitaliza
-          if (!palavrasIgnorar.includes(palavra) && palavra.length > 2) {
-            return palavra.charAt(0).toUpperCase() + palavra.slice(1)
-          }
-          return palavra
-        })
-        .join(' ')
-        .trim()
-      
-      if (ingrediente && ingrediente.length > 2) {
-        ingredientes.push(ingrediente)
-      }
-    }
-    
-    return ingredientes
-  }
-
   // Abrir prompt de customização
   const handleAddItemClick = async (produto: {
     id: number
@@ -228,16 +177,8 @@ export default function Cardapio(): JSX.Element {
         tipo: a.tipo,
       }))
     
-    // Usar ingredientes do banco ou extrair da descrição como fallback
-    const ingredientes = produto.ingredientes && produto.ingredientes.length > 0
-      ? produto.ingredientes
-      : extrairIngredientesDaDescricao(produto.descricao)
-    
     setExtrasDisponiveis(extras)
-    setProdutoSelecionado({
-      ...produto,
-      ingredientes: ingredientes,
-    })
+    setProdutoSelecionado(produto)
     setPromptAberto(true)
   }
 
@@ -253,7 +194,7 @@ export default function Cardapio(): JSX.Element {
     })
     
     setProdutoAdicionado(String(produtoSelecionado.id))
-    setTimeout(() => setProdutoAdicionado(null), 2000)
+    setTimeout(() => setProdutoAdicionado(null), 600)
     
     setPromptAberto(false)
     setProdutoSelecionado(null)
@@ -285,7 +226,7 @@ export default function Cardapio(): JSX.Element {
     })
 
     setProdutoAdicionado(String(produtoSelecionado.id))
-    setTimeout(() => setProdutoAdicionado(null), 2000)
+    setTimeout(() => setProdutoAdicionado(null), 600)
 
     setModalCustomizacaoAberto(false)
     setProdutoSelecionado(null)
