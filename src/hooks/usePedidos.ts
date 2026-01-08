@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { pedidosService,  Pedido } from '../services/api/pedidos.service'
+import { supabase } from '../services/supabaseClient'
 
 export default function usePedidos() {
   const [loading, setLoading] = useState(false)
@@ -55,19 +56,28 @@ export default function usePedidos() {
   )
 
   const criarPedido = useCallback(
-    async (pedido: Omit<Pedido, 'id'>) => {
+    async function criarPedido(pedido: any): Promise<boolean> {
       setLoading(true)
       setError(null)
-      try {
-        return await pedidosService.create(pedido)
-      } catch (e: any) {
-        setError(e)
-        return false
-      } finally {
+
+      const { data, error } = await supabase
+        .from('pedidos')
+        .insert([pedido])
+        .select()
+        .single()
+
+      console.log('🧪 Supabase response:', { data, error })
+
+      if (error) {
+        alert('SUPABASE ERROR: ' + error.message)
+        console.error(error)
         setLoading(false)
+        return false
       }
+
+      setLoading(false)
+      return true
     },
-    []
   )
 
   const atualizarStatus = useCallback(

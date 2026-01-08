@@ -1,0 +1,12 @@
+import { jsxDEV } from "react/jsx-dev-runtime";
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import AppRoutes from './app/routes'
+
+ReactDOM.createRoot(
+  document.getElementById('root')!
+).render(
+  <React.StrictMode>
+    <AppRoutes />
+  </React.StrictMode>
+)
