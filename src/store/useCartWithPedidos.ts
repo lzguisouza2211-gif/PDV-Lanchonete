@@ -1,5 +1,8 @@
 import { useCart } from './useCart'
 import usePedidos from '../hooks/usePedidos'
+import { supabase } from '../services/supabaseClient'
+import { normalizePedidoPayload } from '../utils/pedido'
+import { withTimeout, getFriendlyErrorMessage } from '../utils/timeout'
 
 export function useCartWithPedidos() {
   const cart = useCart()
@@ -12,42 +15,47 @@ export function useCartWithPedidos() {
     formaPagamento?: string
     troco?: number | string
   }) {
-    if (!input.cliente) {
-      throw new Error('Nome do cliente é obrigatório')
+    // Tentar obter user_id se houver sessão autenticada
+    let userId: string | null = null
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      userId = session?.user?.id ?? null
+    } catch (e) {
+      // Ignora erro se não houver sessão (anon pode fazer pedido)
     }
 
-    if (cart.items.length === 0) {
-      throw new Error('Carrinho vazio')
-    }
-
-    const pedido = {
-      cliente: input.cliente,
-      tipoentrega: input.tipoEntrega ?? null,
-      endereco: input.endereco ?? null,
-      formapagamento: input.formaPagamento ?? null,
-      troco: input.troco ?? null,
-      status: 'Recebido',
-      total: cart.items.reduce(
-        (s, i) => s + i.price * i.qty,
-        0
-      ),
-      itens: cart.items.map((item) => ({
-        nome: item.name,
-        preco: item.price,
-        adicionais: [], // ✅ formato esperado pelo banco
-      })),
-    }
+    // Normaliza e valida payload
+    const pedido = normalizePedidoPayload(
+      {
+        ...input,
+        user_id: userId,
+      },
+      cart.items
+    )
 
     console.log('📦 Pedido enviado:', pedido)
 
-    const criado = await criarPedidoService(pedido)
+    try {
+      // Adiciona timeout de 15s
+      const criarPedidoPromise = criarPedidoService(pedido)
+      const criado = await withTimeout(
+        criarPedidoPromise,
+        15000,
+        'Tempo limite excedido. Verifique sua conexão e tente novamente.'
+      )
 
-    if (!criado) {
-      throw new Error('Erro ao enviar pedido')
+      if (!criado) {
+        throw new Error('Erro ao enviar pedido')
+      }
+
+      // Só limpa o carrinho APÓS confirmação de sucesso
+      cart.clear()
+      return true
+    } catch (error: any) {
+      // Converte erro para mensagem amigável
+      const friendlyMessage = getFriendlyErrorMessage(error)
+      throw new Error(friendlyMessage)
     }
-
-    cart.clear()
-    return true
   }
 
   return {

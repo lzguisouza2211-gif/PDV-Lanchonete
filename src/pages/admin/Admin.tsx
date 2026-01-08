@@ -6,14 +6,14 @@ import {
 } from '@hello-pangea/dnd'
 
 import { Pedido } from '../../services/api/pedidos.service'
-import  usePedidos  from '../../hooks/usePedidos'
+import usePedidos from '../../hooks/usePedidos'
 import { supabase } from '../../services/supabaseClient'
 
 const COLUMNS = [
-  { id: 'Recebido', title: 'Recebido', color: '#fff3cd' },
-  { id: 'confirmação', title: 'Confirmação', color: '#d1ecf1' },
-  { id: 'Em preparo', title: 'Em preparo', color: '#cfe2ff' },
-  { id: 'Finalizado', title: 'Finalizado', color: '#d1e7dd' },
+  { id: 'Recebido', title: 'Recebido', color: '#fff3cd', icon: '📥' },
+  { id: 'confirmação', title: 'Confirmação', color: '#d1ecf1', icon: '✅' },
+  { id: 'Em preparo', title: 'Em preparo', color: '#cfe2ff', icon: '👨‍🍳' },
+  { id: 'Finalizado', title: 'Finalizado', color: '#d1e7dd', icon: '🎉' },
 ]
 
 export default function Admin() {
@@ -102,17 +102,42 @@ export default function Admin() {
     await atualizarStatus(pedidoId, destino)
   }
 
-  if (loading) return <p>Carregando pedidos...</p>
-  if (error) return <p>Erro ao carregar pedidos</p>
+  if (loading)
+    return (
+      <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+        <p style={{ fontSize: 18, color: '#666' }}>Carregando pedidos...</p>
+      </div>
+    )
+  if (error)
+    return (
+      <div
+        style={{
+          background: '#fee',
+          padding: 16,
+          borderRadius: 8,
+          color: '#c0392b',
+        }}
+      >
+        <p style={{ margin: 0 }}>Erro ao carregar pedidos</p>
+      </div>
+    )
 
   const hoje = new Date().toISOString().slice(0, 10)
 
   return (
-    <main style={{ padding: 24, background: '#f4f5f7', minHeight: '100vh' }}>
-      <h1 style={{ marginBottom: 24 }}>Painel de Pedidos</h1>
+    <div style={{ maxWidth: 1400, margin: '0 auto', padding: '24px' }}>
+      <h1 style={{ marginBottom: 32, fontSize: 32, fontWeight: 700 }}>
+        📋 Painel de Pedidos
+      </h1>
 
       <DragDropContext onDragEnd={onDragEnd}>
-        <div style={{ display: 'flex', gap: 20 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: 20,
+          }}
+        >
           {COLUMNS.map((col) => {
             let pedidosColuna = pedidos.filter(
               (p) => (p.status ?? 'Recebido') === col.id
@@ -134,90 +159,186 @@ export default function Admin() {
                     ref={provided.innerRef}
                     {...provided.droppableProps}
                     style={{
-                      flex: 1,
-                      background: col.color,
-                      borderRadius: 12,
-                      padding: 12,
+                      background: '#fff',
+                      borderRadius: 16,
+                      padding: 20,
                       minHeight: 500,
+                      boxShadow: '0 4px 12px rgba(0,0,0,.1)',
+                      borderTop: `4px solid ${col.color}`,
                     }}
                   >
-                    <h3 style={{ textAlign: 'center', marginBottom: 12 }}>
-                      {col.title}
-                    </h3>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginBottom: 16,
+                        paddingBottom: 12,
+                        borderBottom: '2px solid #f3f4f6',
+                      }}
+                    >
+                      <span style={{ fontSize: 20 }}>{col.icon}</span>
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontSize: 18,
+                          fontWeight: 600,
+                          color: '#1a1a1a',
+                        }}
+                      >
+                        {col.title}
+                      </h3>
+                      <span
+                        style={{
+                          marginLeft: 'auto',
+                          background: col.color,
+                          color: '#1a1a1a',
+                          padding: '4px 12px',
+                          borderRadius: 12,
+                          fontSize: 12,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {pedidosColuna.length}
+                      </span>
+                    </div>
 
-                    {pedidosColuna.map((pedido, index) => {
-                      const bloqueado = pedido.status === 'Finalizado'
-                      const hora = (pedido as any).created_at
-                        ? new Date(
-                            (pedido as any).created_at
-                          ).toLocaleTimeString('pt-BR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                        : '--:--'
+                    {pedidosColuna.length === 0 ? (
+                      <div
+                        style={{
+                          textAlign: 'center',
+                          padding: '40px 20px',
+                          color: '#999',
+                          fontSize: 14,
+                        }}
+                      >
+                        Nenhum pedido
+                      </div>
+                    ) : (
+                      pedidosColuna.map((pedido, index) => {
+                        const bloqueado = pedido.status === 'Finalizado'
+                        const hora = (pedido as any).created_at
+                          ? new Date(
+                              (pedido as any).created_at
+                            ).toLocaleTimeString('pt-BR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : '--:--'
 
-                      return (
-                        <Draggable
-                          key={pedido.id}
-                          draggableId={String(pedido.id)}
-                          index={index}
-                          isDragDisabled={bloqueado}
-                        >
-                          {(provided) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              onClick={() =>
-                                setPedidoSelecionado(pedido)
-                              }
-                              style={{
-                                background: '#fff',
-                                borderRadius: 10,
-                                padding: 12,
-                                marginBottom: 10,
-                                cursor: 'pointer',
-                                boxShadow:
-                                  '0 2px 6px rgba(0,0,0,0.15)',
-                                opacity: bloqueado ? 0.7 : 1,
-                                ...provided.draggableProps.style,
-                              }}
-                            >
-                              <div style={{ fontWeight: 600 }}>
-                                {pedido.cliente}
-                              </div>
-
-                              <div style={{ fontSize: 13, marginTop: 4 }}>
-                                📦 {pedido.tipoentrega ?? 'retirada'}
-                              </div>
-
-                              <div style={{ fontSize: 13 }}>
-                                💳 {pedido.formapagamento ?? '-'}
-                              </div>
-
-                              <div style={{ marginTop: 6 }}>
-                                <strong>
-                                  R$ {pedido.total.toFixed(2)}
-                                </strong>
-                              </div>
-
+                        return (
+                          <Draggable
+                            key={pedido.id}
+                            draggableId={String(pedido.id)}
+                            index={index}
+                            isDragDisabled={bloqueado}
+                          >
+                            {(provided) => (
                               <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                onClick={() => setPedidoSelecionado(pedido)}
                                 style={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  marginTop: 6,
-                                  fontSize: 12,
-                                  color: '#555',
+                                  background: '#f9fafb',
+                                  borderRadius: 12,
+                                  padding: 16,
+                                  marginBottom: 12,
+                                  cursor: bloqueado ? 'default' : 'pointer',
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                                  opacity: bloqueado ? 0.7 : 1,
+                                  border: '1px solid #e5e7eb',
+                                  transition: 'all 0.2s ease',
+                                  ...provided.draggableProps.style,
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!bloqueado) {
+                                    e.currentTarget.style.background = '#fff'
+                                    e.currentTarget.style.boxShadow =
+                                      '0 4px 12px rgba(0,0,0,0.12)'
+                                    e.currentTarget.style.transform =
+                                      'translateY(-2px)'
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!bloqueado) {
+                                    e.currentTarget.style.background = '#f9fafb'
+                                    e.currentTarget.style.boxShadow =
+                                      '0 2px 6px rgba(0,0,0,0.08)'
+                                    e.currentTarget.style.transform =
+                                      'translateY(0)'
+                                  }
                                 }}
                               >
-                                <span>🕒 {hora}</span>
-                                <span>#{pedido.id}</span>
+                                <div
+                                  style={{
+                                    fontWeight: 600,
+                                    fontSize: 16,
+                                    marginBottom: 8,
+                                    color: '#1a1a1a',
+                                  }}
+                                >
+                                  {pedido.cliente}
+                                </div>
+
+                                <div
+                                  style={{
+                                    fontSize: 13,
+                                    color: '#666',
+                                    marginBottom: 8,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 4,
+                                  }}
+                                >
+                                  <div>
+                                    📦 {pedido.tipoentrega ?? 'retirada'}
+                                  </div>
+                                  <div>
+                                    💳 {pedido.formapagamento ?? '-'}
+                                  </div>
+                                </div>
+
+                                <div
+                                  style={{
+                                    marginTop: 12,
+                                    paddingTop: 12,
+                                    borderTop: '1px solid #e5e7eb',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                  }}
+                                >
+                                  <div>
+                                    <strong
+                                      style={{
+                                        fontSize: 18,
+                                        color: '#c0392b',
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      R$ {pedido.total.toFixed(2)}
+                                    </strong>
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: 11,
+                                      color: '#999',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'flex-end',
+                                    }}
+                                  >
+                                    <span>🕒 {hora}</span>
+                                    <span>#{pedido.id}</span>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </Draggable>
-                      )
-                    })}
+                            )}
+                          </Draggable>
+                        )
+                      })
+                    )}
 
                     {provided.placeholder}
                   </div>
@@ -237,53 +358,246 @@ export default function Admin() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
+            background: 'rgba(0,0,0,0.7)',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
             zIndex: 1000,
+            animation: 'fadeIn 0.2s ease',
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
               background: '#fff',
-              borderRadius: 12,
-              padding: 20,
+              borderRadius: 20,
+              padding: 32,
               width: '100%',
-              maxWidth: 500,
+              maxWidth: 600,
               maxHeight: '90vh',
               overflowY: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              animation: 'scaleIn 0.2s ease',
             }}
           >
-            <h2>Pedido #{pedidoSelecionado.id}</h2>
-            <h3 style={{ marginTop: 16 }}>Itens</h3>
-            <ul>
-              {pedidoSelecionado.itens.map((item, idx) => (
-                <li key={idx}>
-                  {item.nome} – R$ {item.preco}
-                </li>
-              ))}
-            </ul>
-            <p><strong>Cliente:</strong> {pedidoSelecionado.cliente}</p>
-            <p><strong>Tipo de Entrega:</strong> {pedidoSelecionado.tipoentrega}</p>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 24,
+                paddingBottom: 16,
+                borderBottom: '2px solid #f3f4f6',
+              }}
+            >
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 24,
+                  fontWeight: 700,
+                  color: '#1a1a1a',
+                }}
+              >
+                Pedido #{pedidoSelecionado.id}
+              </h2>
+              <button
+                onClick={() => setPedidoSelecionado(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: 24,
+                  cursor: 'pointer',
+                  padding: '4px 8px',
+                  borderRadius: 8,
+                  transition: 'background 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ marginBottom: 24 }}>
+              <h3
+                style={{
+                  marginBottom: 12,
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: '#1a1a1a',
+                }}
+              >
+                Itens
+              </h3>
+              <div style={{ background: '#f9fafb', borderRadius: 12, padding: 16 }}>
+                {pedidoSelecionado.itens.map((item, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      padding: '8px 0',
+                      borderBottom:
+                        idx < pedidoSelecionado.itens.length - 1
+                          ? '1px solid #e5e7eb'
+                          : 'none',
+                    }}
+                  >
+                    <span style={{ fontWeight: 500 }}>{item.nome}</span>
+                    <span style={{ color: '#666' }}>
+                      R$ {item.preco.toFixed(2)}
+                      {item.quantidade && item.quantidade > 1
+                        ? ` x${item.quantidade}`
+                        : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: 16,
+                marginBottom: 24,
+              }}
+            >
+              <InfoItem
+                label="Cliente"
+                value={pedidoSelecionado.cliente}
+              />
+              <InfoItem
+                label="Tipo de Entrega"
+                value={pedidoSelecionado.tipoentrega ?? 'retirada'}
+              />
               {pedidoSelecionado.tipoentrega === 'entrega' && (
-              <p><strong>Endereço:</strong> {pedidoSelecionado.endereco}</p>
-            )}
-            <p><strong>Total:</strong> R$ {pedidoSelecionado.total}</p>
-            <p><strong>Forma de Pagamento:</strong> {pedidoSelecionado.formapagamento}</p>
-             
-            <p><strong>Troco:</strong> R$ {pedidoSelecionado.troco}</p>
+                <InfoItem
+                  label="Endereço"
+                  value={pedidoSelecionado.endereco ?? '-'}
+                />
+              )}
+              <InfoItem
+                label="Forma de Pagamento"
+                value={pedidoSelecionado.formapagamento ?? '-'}
+              />
+              {pedidoSelecionado.troco && (
+                <InfoItem
+                  label="Troco"
+                  value={`R$ ${Number(pedidoSelecionado.troco).toFixed(2)}`}
+                />
+              )}
+            </div>
+
+            <div
+              style={{
+                padding: 20,
+                background: '#f9fafb',
+                borderRadius: 12,
+                textAlign: 'center',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 14,
+                  color: '#666',
+                  marginBottom: 8,
+                }}
+              >
+                Total
+              </div>
+              <div
+                style={{
+                  fontSize: 32,
+                  fontWeight: 700,
+                  color: '#c0392b',
+                }}
+              >
+                R$ {pedidoSelecionado.total.toFixed(2)}
+              </div>
+            </div>
+
             <button
-              style={{ marginTop: 16 }}
               onClick={() => setPedidoSelecionado(null)}
+              style={{
+                marginTop: 24,
+                width: '100%',
+                padding: 14,
+                borderRadius: 8,
+                border: 'none',
+                background: '#c0392b',
+                color: '#fff',
+                fontWeight: 600,
+                fontSize: 16,
+                cursor: 'pointer',
+                transition: 'background 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#a93226'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#c0392b'
+              }}
             >
               Fechar
             </button>
           </div>
         </div>
       )}
-    </main>
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes scaleIn {
+          from { 
+            transform: scale(0.95);
+            opacity: 0;
+          }
+          to { 
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
+    </div>
   )
 }
 
+function InfoItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        background: '#f9fafb',
+        padding: 12,
+        borderRadius: 8,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 12,
+          color: '#666',
+          marginBottom: 4,
+          fontWeight: 500,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 600,
+          color: '#1a1a1a',
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  )
+}

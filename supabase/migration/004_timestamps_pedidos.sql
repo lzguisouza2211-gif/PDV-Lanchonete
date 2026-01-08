@@ -28,3 +28,4 @@ create trigger trg_set_updated_at
 before update on public.pedidos
 for each row
 execute procedure public.set_updated_at();
+

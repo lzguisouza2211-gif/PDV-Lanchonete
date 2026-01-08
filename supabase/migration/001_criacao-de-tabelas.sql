@@ -11,14 +11,15 @@ create table if not exists cardapio (
 create table if not exists pedidos (
   id bigint generated always as identity primary key,
   cliente text not null,
-  tipoEntrega text,
+  tipoentrega text,
   endereco text,
   itens jsonb not null,
-  formaPagamento text,
+  formapagamento text,
   troco numeric,
   total numeric not null,
   data timestamptz default now(),
-  status text default 'Recebido'
+  status text default 'Recebido',
+  user_id uuid references auth.users(id) on delete set null
 );
 
 create index if not exists cardapio_categoria_idx on cardapio(categoria);

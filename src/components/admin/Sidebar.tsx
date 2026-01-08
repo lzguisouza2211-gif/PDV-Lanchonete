@@ -1,19 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { supabase } from '../../services/supabaseClient'
 
-const linkStyle = {
-  padding: '10px 12px',
-  borderRadius: 8,
-  textDecoration: 'none',
-  color: '#333',
-  fontWeight: 500,
-}
-
-const activeStyle = {
-  background: '#f4f5f7',
-  fontWeight: 700,
-}
-
 export default function Sidebar() {
   async function sair() {
     await supabase.auth.signOut()
@@ -23,83 +10,192 @@ export default function Sidebar() {
   return (
     <aside
       style={{
-        width: 240,
+        width: 260,
         background: '#fff',
-        borderRight: '1px solid #e5e5e5',
-        padding: 20,
+        borderRight: '1px solid #e5e7eb',
+        padding: 24,
         display: 'flex',
         flexDirection: 'column',
-        gap: 24,
+        gap: 32,
+        boxShadow: '2px 0 8px rgba(0,0,0,0.04)',
       }}
     >
       {/* LOGO / PERFIL */}
-      <div style={{ textAlign: 'center' }}>
+      <div
+        style={{
+          textAlign: 'center',
+          paddingBottom: 24,
+          borderBottom: '2px solid #f3f4f6',
+        }}
+      >
         <div
           style={{
-            width: 64,
-            height: 64,
+            width: 72,
+            height: 72,
             borderRadius: '50%',
-            background: '#ddd',
-            margin: '0 auto 8px',
+            background: 'linear-gradient(135deg, #c0392b 0%, #e74c3c 100%)',
+            margin: '0 auto 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 32,
+            boxShadow: '0 4px 12px rgba(192, 57, 43, 0.3)',
           }}
-        />
-        <strong style={{ display: 'block' }}>Luizão Lanches</strong>
-        <span style={{ fontSize: 12, color: '#777' }}>
+        >
+          🍔
+        </div>
+        <strong
+          style={{
+            display: 'block',
+            fontSize: 18,
+            fontWeight: 700,
+            color: '#1a1a1a',
+            marginBottom: 4,
+          }}
+        >
+          Luizão Lanches
+        </strong>
+        <span
+          style={{
+            fontSize: 13,
+            color: '#666',
+            background: '#f3f4f6',
+            padding: '4px 12px',
+            borderRadius: 12,
+            display: 'inline-block',
+          }}
+        >
           Administrador
         </span>
       </div>
 
       {/* NAVEGAÇÃO */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <NavLink
           to="/admin/dashboard"
-          style={({ isActive }) =>
-            isActive
-              ? { ...linkStyle, ...activeStyle }
-              : linkStyle
-          }
+          style={({ isActive }) => ({
+            padding: '14px 16px',
+            borderRadius: 12,
+            textDecoration: 'none',
+            color: isActive ? '#c0392b' : '#666',
+            fontWeight: isActive ? 700 : 500,
+            background: isActive ? '#fef2f2' : 'transparent',
+            borderLeft: isActive ? '4px solid #c0392b' : '4px solid transparent',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            fontSize: 15,
+            transition: 'all 0.2s ease',
+          })}
+          onMouseEnter={(e) => {
+            if (!e.currentTarget.style.background.includes('fef2f2')) {
+              e.currentTarget.style.background = '#f9fafb'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!e.currentTarget.style.background.includes('fef2f2')) {
+              e.currentTarget.style.background = 'transparent'
+            }
+          }}
         >
-          📊 Dashboard
+          <span style={{ fontSize: 20 }}>📊</span>
+          Dashboard
         </NavLink>
 
         <NavLink
           to="/admin/pedidos"
-          style={({ isActive }) =>
-            isActive
-              ? { ...linkStyle, ...activeStyle }
-              : linkStyle
-          }
+          style={({ isActive }) => ({
+            padding: '14px 16px',
+            borderRadius: 12,
+            textDecoration: 'none',
+            color: isActive ? '#c0392b' : '#666',
+            fontWeight: isActive ? 700 : 500,
+            background: isActive ? '#fef2f2' : 'transparent',
+            borderLeft: isActive ? '4px solid #c0392b' : '4px solid transparent',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            fontSize: 15,
+            transition: 'all 0.2s ease',
+          })}
+          onMouseEnter={(e) => {
+            if (!e.currentTarget.style.background.includes('fef2f2')) {
+              e.currentTarget.style.background = '#f9fafb'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!e.currentTarget.style.background.includes('fef2f2')) {
+              e.currentTarget.style.background = 'transparent'
+            }
+          }}
         >
-          📦 Pedidos
+          <span style={{ fontSize: 20 }}>📦</span>
+          Pedidos
         </NavLink>
 
         <NavLink
           to="/admin/financeiro"
-          style={({ isActive }) =>
-            isActive
-              ? { ...linkStyle, ...activeStyle }
-              : linkStyle
-          }
+          style={({ isActive }) => ({
+            padding: '14px 16px',
+            borderRadius: 12,
+            textDecoration: 'none',
+            color: isActive ? '#c0392b' : '#666',
+            fontWeight: isActive ? 700 : 500,
+            background: isActive ? '#fef2f2' : 'transparent',
+            borderLeft: isActive ? '4px solid #c0392b' : '4px solid transparent',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            fontSize: 15,
+            transition: 'all 0.2s ease',
+          })}
+          onMouseEnter={(e) => {
+            if (!e.currentTarget.style.background.includes('fef2f2')) {
+              e.currentTarget.style.background = '#f9fafb'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!e.currentTarget.style.background.includes('fef2f2')) {
+              e.currentTarget.style.background = 'transparent'
+            }
+          }}
         >
-          💰 Financeiro
+          <span style={{ fontSize: 20 }}>💰</span>
+          Financeiro
         </NavLink>
       </nav>
 
       {/* SAIR */}
-      <div style={{ marginTop: 'auto' }}>
+      <div style={{ marginTop: 'auto', paddingTop: 24, borderTop: '2px solid #f3f4f6' }}>
         <button
           onClick={sair}
           style={{
             width: '100%',
-            padding: '10px',
-            borderRadius: 8,
+            padding: '14px 16px',
+            borderRadius: 12,
             border: 'none',
-            background: '#dc3545',
+            background: 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)',
             color: '#fff',
             fontWeight: 600,
+            fontSize: 15,
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            transition: 'all 0.2s ease',
+            boxShadow: '0 2px 8px rgba(220, 53, 69, 0.3)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(220, 53, 69, 0.4)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(220, 53, 69, 0.3)'
           }}
         >
+          <span>🚪</span>
           Sair
         </button>
       </div>

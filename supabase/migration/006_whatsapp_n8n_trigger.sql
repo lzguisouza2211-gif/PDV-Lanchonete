@@ -1,3 +1,6 @@
+-- ============================================
+-- TRIGGER PARA NOTIFICAÇÃO N8N
+-- ============================================
 
 create or replace function public.notify_pedido_confirmado()
 returns trigger
@@ -30,10 +33,10 @@ begin
 end;
 $$;
 
-
 drop trigger if exists trg_notify_pedido_confirmado on pedidos;
 
 create trigger trg_notify_pedido_confirmado
 after update on pedidos
 for each row
 execute function public.notify_pedido_confirmado();
+
