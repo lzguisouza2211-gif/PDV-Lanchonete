@@ -27,10 +27,10 @@ export default function CategoryTabs({
       <div
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           gap: 8,
-          overflowX: 'auto',
           padding: '0 24px',
-          scrollbarWidth: 'thin',
+          justifyContent: 'center',
         }}
       >
         {categorias.map((categoria) => {
@@ -48,11 +48,11 @@ export default function CategoryTabs({
                 fontWeight: isActive ? 700 : 500,
                 fontSize: 14,
                 cursor: 'pointer',
-                whiteSpace: 'nowrap',
                 transition: 'all 0.2s ease',
                 boxShadow: isActive
                   ? '0 2px 8px rgba(192, 57, 43, 0.3)'
                   : 'none',
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
