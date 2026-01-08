@@ -1,11 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import { useAdminAuth } from '../../hooks/useAdminAuth'
-import { Navigate } from 'react-router-dom'
-import { useAdminAuth } from '../../hooks/useAdminAuth'
 
-type Props = {
-  children: JSX.Element
-}
 type Props = {
   children: JSX.Element
 }

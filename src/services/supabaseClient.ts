@@ -1,16 +1,10 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient }  from '@supabase/supabase-js'
 
-const url = (process.env.REACT_APP_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) as string | undefined
-const key = (process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY) as string | undefined
+const url = import.meta.env.VITE_SUPABASE_URL
+const key = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// export at top-level; assign implementation conditionally
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _supabase: SupabaseClient | any = null
-
-if (url && key) {
-	_supabase = createClient(url, key)
+if (!url || !key) {
+  throw new Error('Supabase env vars not found')
 }
 
-export const supabase = _supabase
-
-// Nota: para operações sensíveis (inserir pedidos), use a Service Role Key no backend
+export const supabase: SupabaseClient = createClient(url, key)
