@@ -1,9 +1,11 @@
 import { useEffect, useState, useMemo } from 'react'
 import usePedidos from '../../hooks/usePedidos'
 import { Pedido } from '../../services/api/pedidos.service'
+import { useStoreStatus } from '../../hooks/useStoreStatus'
 
 export default function Dashboard() {
   const { listPedidos, loading, error } = usePedidos()
+  const { isOpen } = useStoreStatus()
   const [pedidos, setPedidos] = useState<Pedido[]>([])
 
   useEffect(() => {
@@ -85,6 +87,37 @@ export default function Dashboard() {
         >
           {hoje}
         </p>
+        <div
+          style={{
+            marginTop: 12,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 16px',
+            borderRadius: 20,
+            background: isOpen ? '#f0fdf4' : '#fef2f2',
+            border: `1px solid ${isOpen ? '#bbf7d0' : '#fecaca'}`,
+          }}
+        >
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: isOpen ? '#22c55e' : '#ef4444',
+              display: 'block',
+            }}
+          />
+          <span
+            style={{
+              fontSize: 14,
+              color: isOpen ? '#166534' : '#991b1b',
+              fontWeight: 600,
+            }}
+          >
+            {isOpen ? '🟢 Loja Aberta' : '🔴 Loja Fechada'}
+          </span>
+        </div>
       </div>
 
       {/* CARDS DE MÉTRICAS */}
@@ -97,25 +130,25 @@ export default function Dashboard() {
         }}
       >
         <FinanceCard
-          titulo="💰 Faturamento do Dia"
+          titulo=" Faturamento do Dia"
           valor={`R$ ${faturamento.toFixed(2)}`}
           cor="#c0392b"
           icone="💰"
         />
         <FinanceCard
-          titulo="📦 Pedidos Hoje"
+          titulo=" Pedidos Hoje"
           valor={totalPedidos}
           cor="#3498db"
           icone="📦"
         />
         <FinanceCard
-          titulo="🚚 Entregas"
+          titulo=" Entregas"
           valor={entregas}
           cor="#e67e22"
           icone="🚚"
         />
         <FinanceCard
-          titulo="🏪 Retiradas"
+          titulo=" Retiradas"
           valor={retiradas}
           cor="#9b59b6"
           icone="🏪"

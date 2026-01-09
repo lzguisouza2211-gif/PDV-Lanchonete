@@ -6,6 +6,8 @@ export type ItemCardapio = {
   preco: number
   categoria: string
   ativo: boolean
+  descricao?: string
+  ingredientes?: string[]
 }
 
 class CardapioService {
@@ -19,7 +21,16 @@ class CardapioService {
       throw error
     }
 
-    return data as ItemCardapio[]
+    // Parse ingredientes JSON se existir
+    return (data || []).map((item: any) => ({
+      ...item,
+      id: String(item.id),
+      ingredientes: Array.isArray(item.ingredientes)
+        ? item.ingredientes
+        : typeof item.ingredientes === 'string'
+        ? JSON.parse(item.ingredientes || '[]')
+        : item.ingredientes || [],
+    })) as ItemCardapio[]
   }
 }
 

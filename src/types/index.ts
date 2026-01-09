@@ -5,10 +5,18 @@ export type Produto = {
   descricao?: string
 }
 
+export type ExtraItem = {
+  nome: string
+  preco: number
+  tipo: 'add' | 'remove'
+}
+
 export type ItemPedido = {
   produtoId: string
   quantidade: number
   adicionais?: Array<{ nome: string; preco: number }>
+  observacoes?: string
+  extras?: ExtraItem[]
 }
 
 export type Pedido = {

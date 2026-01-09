@@ -24,6 +24,7 @@ export default function Financeiro() {
 
   const [resumos, setResumos] = useState<any[]>([])
   const [itensVendidos, setItensVendidos] = useState<any[]>([])
+  const [fechamentoRealizado, setFechamentoRealizado] = useState(false)
 
   /* =======================
      LOAD DADOS
@@ -438,23 +439,44 @@ export default function Financeiro() {
           🏁 Fechamento de Caixa
         </h3>
 
-        <div style={{ marginBottom: 20 }}>
-          <p style={{ margin: '8px 0', fontSize: 16 }}>
-            <strong>Período:</strong>{' '}
-            {periodo === 'dia'
-              ? new Date(data).toLocaleDateString('pt-BR')
-              : new Date(data + '-01').toLocaleDateString('pt-BR', {
-                  month: 'long',
-                  year: 'numeric',
-                })}
-          </p>
-          <p style={{ margin: '8px 0', fontSize: 16 }}>
-            <strong>Total:</strong>{' '}
-            <span style={{ fontSize: 20, color: '#c0392b', fontWeight: 700 }}>
-              R$ {resumoGeral.faturamento.toFixed(2)}
-            </span>
-          </p>
-        </div>
+        {!fechamentoRealizado && (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ margin: '8px 0', fontSize: 16 }}>
+              <strong>Período:</strong>{' '}
+              {periodo === 'dia'
+                ? new Date(data).toLocaleDateString('pt-BR')
+                : new Date(data + '-01').toLocaleDateString('pt-BR', {
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+            </p>
+            <p style={{ margin: '8px 0', fontSize: 16 }}>
+              <strong>Total:</strong>{' '}
+              <span style={{ fontSize: 20, color: '#c0392b', fontWeight: 700 }}>
+                R$ {resumoGeral.faturamento.toFixed(2)}
+              </span>
+            </p>
+          </div>
+        )}
+
+        {fechamentoRealizado && (
+          <div
+            style={{
+              padding: 20,
+              background: '#d1e7dd',
+              borderRadius: 12,
+              marginBottom: 20,
+              border: '2px solid #86efac',
+            }}
+          >
+            <p style={{ margin: 0, fontSize: 16, color: '#166534', fontWeight: 600 }}>
+              ✅ Caixa fechado com sucesso!
+            </p>
+            <p style={{ margin: '8px 0 0 0', fontSize: 14, color: '#166534' }}>
+              O fechamento foi registrado. Você pode fechar novamente se necessário.
+            </p>
+          </div>
+        )}
 
         <button
           onClick={async () => {
@@ -483,12 +505,17 @@ export default function Financeiro() {
             })
 
             if (resultado.sucesso) {
-              alert(`✅ ${resultado.mensagem}`)
+              // Limpar formulário e esconder valor
+              setFechamentoRealizado(true)
+              // Resetar após 3 segundos para permitir novo fechamento se necessário
+              setTimeout(() => {
+                setFechamentoRealizado(false)
+              }, 3000)
             } else {
               alert(`❌ ${resultado.mensagem}\n\nVerifique o console para mais detalhes.`)
             }
           }}
-          disabled={loading}
+          disabled={loading || fechamentoRealizado}
           style={{
             padding: '14px 28px',
             background: loading ? '#95a5a6' : '#16a34a',

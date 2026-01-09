@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 
 type ProductCardProps = {
   id: number
@@ -7,6 +7,8 @@ type ProductCardProps = {
   descricao?: string
   onAdd: () => void
   isAdding?: boolean
+  lojaAberta?: boolean
+  justAdded?: boolean
 }
 
 export default function ProductCard({
@@ -15,13 +17,13 @@ export default function ProductCard({
   descricao,
   onAdd,
   isAdding = false,
+  lojaAberta = true,
+  justAdded = false,
 }: ProductCardProps) {
-  const [justAdded, setJustAdded] = useState(false)
-
   const handleAdd = () => {
-    onAdd()
-    setJustAdded(true)
-    setTimeout(() => setJustAdded(false), 600)
+    if (lojaAberta) {
+      onAdd()
+    }
   }
 
   return (
@@ -38,6 +40,7 @@ export default function ProductCard({
         border: justAdded ? '2px solid #27ae60' : '1px solid transparent',
         position: 'relative',
         overflow: 'hidden',
+        animation: justAdded ? 'pulse 0.5s ease' : 'none',
       }}
       onMouseEnter={(e) => {
         if (!justAdded) {
@@ -52,28 +55,28 @@ export default function ProductCard({
         }
       }}
     >
+      {/* Ícone de checkmark quando adicionado */}
       {justAdded && (
         <div
           style={{
             position: 'absolute',
-            top: 8,
-            right: 8,
+            top: 12,
+            right: 12,
             background: '#27ae60',
-            color: '#fff',
             borderRadius: '50%',
-            width: 32,
-            height: 32,
+            width: 28,
+            height: 28,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 18,
-            animation: 'bounceIn 0.3s ease',
+            animation: 'scaleIn 0.3s ease',
             zIndex: 10,
           }}
         >
-          ✓
+          <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>✓</span>
         </div>
       )}
+
       <div style={{ marginBottom: 12 }}>
         <strong
           style={{
@@ -123,12 +126,14 @@ export default function ProductCard({
             e.stopPropagation()
             handleAdd()
           }}
-          disabled={isAdding || justAdded}
+          disabled={isAdding || !lojaAberta || justAdded}
           style={{
             padding: '10px 20px',
             borderRadius: 8,
             border: 'none',
-            background: justAdded
+            background: !lojaAberta
+              ? '#95a5a6'
+              : justAdded
               ? '#27ae60'
               : isAdding
               ? '#95a5a6'
@@ -136,28 +141,49 @@ export default function ProductCard({
             color: '#fff',
             fontWeight: 600,
             fontSize: 14,
-            cursor: isAdding || justAdded ? 'not-allowed' : 'pointer',
+            cursor: isAdding || !lojaAberta || justAdded ? 'not-allowed' : 'pointer',
             transition: 'all 0.3s ease',
             minWidth: 100,
-            transform: justAdded ? 'scale(0.95)' : 'scale(1)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            justifyContent: 'center',
           }}
           onMouseEnter={(e) => {
-            if (!justAdded && !isAdding) {
+            if (!isAdding && lojaAberta && !justAdded) {
               e.currentTarget.style.background = '#a93226'
             }
           }}
           onMouseLeave={(e) => {
-            if (!justAdded && !isAdding) {
+            if (!isAdding && lojaAberta && !justAdded) {
               e.currentTarget.style.background = '#c0392b'
             }
           }}
         >
-          {justAdded ? '✓ Adicionado!' : isAdding ? 'Adicionando...' : 'Adicionar'}
+          {!lojaAberta
+            ? 'Loja Fechada'
+            : justAdded
+            ? '✓ Adicionado!'
+            : isAdding
+            ? 'Adicionando...'
+            : 'Adicionar'}
         </button>
       </div>
 
       <style>{`
-        @keyframes bounceIn {
+        @keyframes pulse {
+          0% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.02);
+          }
+          100% {
+            transform: scale(1);
+          }
+        }
+        
+        @keyframes scaleIn {
           0% {
             transform: scale(0);
             opacity: 0;

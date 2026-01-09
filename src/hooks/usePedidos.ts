@@ -215,6 +215,9 @@ export default function usePedidos() {
             mensagemErro = 'Tabela fechamentos_caixa não encontrada. Execute a migration 007.'
           } else if (error.code === '42501') {
             mensagemErro = 'Sem permissão. Verifique se você é administrador.'
+          } else if (error.code === '23505') {
+            // Violação de constraint unique (data + periodo)
+            mensagemErro = 'Já existe um fechamento de caixa para esta data e período. Não é possível criar dois fechamentos na mesma data.'
           } else if (error.message) {
             mensagemErro = error.message
           }

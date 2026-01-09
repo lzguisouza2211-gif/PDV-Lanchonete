@@ -8,19 +8,25 @@ type CategorySectionProps = {
     nome: string
     preco: number
     descricao?: string
+    ingredientes?: string[]
   }>
-  onAddItem: (item: {
-    id: string
-    name: string
-    price: number
-    qty: number
+  onAddItem: (produto: {
+    id: number
+    nome: string
+    preco: number
+    descricao?: string
+    ingredientes?: string[]
   }) => void
+  lojaAberta: boolean
+  produtoAdicionado?: string | null
 }
 
 export default function CategorySection({
   categoria,
   itens,
   onAddItem,
+  lojaAberta,
+  produtoAdicionado,
 }: CategorySectionProps) {
   return (
     <section
@@ -68,14 +74,15 @@ export default function CategorySection({
             nome={item.nome}
             preco={item.preco}
             descricao={item.descricao}
-            onAdd={() =>
-              onAddItem({
-                id: String(item.id),
-                name: item.nome,
-                price: Number(item.preco),
-                qty: 1,
-              })
-            }
+            onAdd={() => onAddItem({
+              id: item.id,
+              nome: item.nome,
+              preco: item.preco,
+              descricao: item.descricao,
+              ingredientes: item.ingredientes || [],
+            })}
+            lojaAberta={lojaAberta}
+            justAdded={produtoAdicionado === String(item.id)}
           />
         ))}
       </div>

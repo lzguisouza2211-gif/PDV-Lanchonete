@@ -27,10 +27,25 @@ export default function CategoryTabs({
       <div
         style={{
           display: 'flex',
-          flexWrap: 'wrap',
+          overflowX: 'auto',
+          overflowY: 'hidden',
           gap: 8,
           padding: '0 24px',
-          justifyContent: 'center',
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#c0392b #f3f4f6',
+          WebkitOverflowScrolling: 'touch',
+        }}
+        onScroll={(e) => {
+          // Auto-scroll para categoria ativa se necessário
+          const container = e.currentTarget
+          const activeButton = container.querySelector(`[data-active="true"]`) as HTMLElement
+          if (activeButton) {
+            const containerRect = container.getBoundingClientRect()
+            const buttonRect = activeButton.getBoundingClientRect()
+            if (buttonRect.left < containerRect.left || buttonRect.right > containerRect.right) {
+              activeButton.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+            }
+          }
         }}
       >
         {categorias.map((categoria) => {
@@ -38,6 +53,7 @@ export default function CategoryTabs({
           return (
             <button
               key={categoria}
+              data-active={isActive}
               onClick={() => onSelectCategoria(categoria)}
               style={{
                 padding: '12px 20px',
@@ -53,6 +69,8 @@ export default function CategoryTabs({
                   ? '0 2px 8px rgba(192, 57, 43, 0.3)'
                   : 'none',
                 flexShrink: 0,
+                whiteSpace: 'nowrap',
+                minWidth: 'fit-content',
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
@@ -70,6 +88,21 @@ export default function CategoryTabs({
           )
         })}
       </div>
+      
+      <style>{`
+        @media (max-width: 768px) {
+          div[style*="overflowX"]::-webkit-scrollbar {
+            height: 4px;
+          }
+          div[style*="overflowX"]::-webkit-scrollbar-track {
+            background: #f3f4f6;
+          }
+          div[style*="overflowX"]::-webkit-scrollbar-thumb {
+            background: #c0392b;
+            border-radius: 2px;
+          }
+        }
+      `}</style>
     </div>
   )
 }

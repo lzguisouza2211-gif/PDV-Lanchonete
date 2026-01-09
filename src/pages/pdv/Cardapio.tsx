@@ -1,15 +1,19 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { useCardapio } from '../../hooks/useCardapio'
 import { useCartWithPedidos } from '../../store/useCartWithPedidos'
+import { useStoreStatus } from '../../hooks/useStoreStatus'
 import CategorySection from '../../components/pdv/CategorySection'
 import CartDrawer from '../../components/pdv/CartDrawer'
 import SuccessModal from '../../components/pdv/SuccessModal'
 import CategoryTabs from '../../components/pdv/CategoryTabs'
-import Toast from '../../components/pdv/Toast'
+import ProductCustomizationModal, { CustomizationData, ExtraOption } from '../../components/pdv/ProductCustomizationModal'
+import CustomizationPrompt from '../../components/pdv/CustomizationPrompt'
+import { productAddonsService } from '../../services/productAddons'
 
 export default function Cardapio(): JSX.Element {
   const { itens, loading, error } = useCardapio()
   const { items, add, remove, criarPedido } = useCartWithPedidos()
+  const { isOpen: lojaAberta, loading: statusLoading } = useStoreStatus()
 
   const [nome, setNome] = useState('')
   const [tipoEntrega, setTipoEntrega] =
@@ -25,14 +29,29 @@ export default function Cardapio(): JSX.Element {
   const [sucesso, setSucesso] = useState(false)
   const [nomeClienteSucesso, setNomeClienteSucesso] = useState('')
   const [categoriaAtiva, setCategoriaAtiva] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'info' } | null>(null)
+  const [promptAberto, setPromptAberto] = useState(false)
+  const [modalCustomizacaoAberto, setModalCustomizacaoAberto] = useState(false)
+  const [produtoSelecionado, setProdutoSelecionado] = useState<{
+    id: number
+    nome: string
+    preco: number
+    descricao?: string
+    ingredientes?: string[]
+  } | null>(null)
+  const [extrasDisponiveis, setExtrasDisponiveis] = useState<ExtraOption[]>([])
+  const [produtoAdicionado, setProdutoAdicionado] = useState<string | null>(null)
 
   // Prevenir envio duplo
   const enviandoRef = useRef(false)
   const categoriaRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
-  const total = items.reduce((s, i) => s + i.price * i.qty, 0)
-  const aberto = true
+  const total = items.reduce((s, i) => {
+    const precoBase = i.price
+    const precoExtras = (i.extras || []).reduce((sum, extra) => {
+      return sum + (extra.tipo === 'add' ? extra.preco : 0)
+    }, 0)
+    return s + (precoBase + precoExtras) * i.qty
+  }, 0)
 
   /* =======================
      AGRUPAR POR CATEGORIA
@@ -134,13 +153,83 @@ export default function Cardapio(): JSX.Element {
     }
   }
 
-  // Animação ao adicionar item
-  const handleAddItem = (item: { id: string; name: string; price: number; qty: number }) => {
-    add(item)
-    setToast({
-      message: `${item.name} adicionado ao carrinho!`,
-      type: 'success',
+  // Abrir prompt de customização
+  const handleAddItemClick = async (produto: {
+    id: number
+    nome: string
+    preco: number
+    descricao?: string
+    ingredientes?: string[]
+  }) => {
+    if (!lojaAberta) {
+      setErro('A loja está fechada no momento. Tente novamente mais tarde.')
+      return
+    }
+    
+    // Carregar extras do banco (apenas tipo 'add' - adicionais pagos)
+    const addons = await productAddonsService.getByProduct(produto.id)
+    const extras: ExtraOption[] = addons
+      .filter((a) => a.tipo === 'add') // Só adicionais pagos
+      .map((a) => ({
+        id: String(a.id),
+        nome: a.nome,
+        preco: Number(a.preco),
+        tipo: a.tipo,
+      }))
+    
+    setExtrasDisponiveis(extras)
+    setProdutoSelecionado(produto)
+    setPromptAberto(true)
+  }
+
+  // Se não quiser customizar, adiciona direto
+  const handlePromptNo = () => {
+    if (!produtoSelecionado) return
+    
+    add({
+      id: String(produtoSelecionado.id),
+      name: produtoSelecionado.nome,
+      price: produtoSelecionado.preco,
+      qty: 1,
     })
+    
+    setProdutoAdicionado(String(produtoSelecionado.id))
+    setTimeout(() => setProdutoAdicionado(null), 600)
+    
+    setPromptAberto(false)
+    setProdutoSelecionado(null)
+  }
+
+  // Se quiser customizar, abre modal
+  const handlePromptYes = () => {
+    setPromptAberto(false)
+    setModalCustomizacaoAberto(true)
+  }
+
+  // Confirmar customização e adicionar ao carrinho
+  const handleConfirmCustomization = (data: CustomizationData) => {
+    if (!produtoSelecionado) return
+
+    const precoBase = produtoSelecionado.preco
+    const precoExtras = data.extras.reduce((sum, extra) => {
+      return sum + (extra.tipo === 'add' ? extra.preco : 0)
+    }, 0)
+    const precoTotal = precoBase + precoExtras
+
+    add({
+      id: String(produtoSelecionado.id),
+      name: produtoSelecionado.nome,
+      price: precoTotal,
+      qty: 1,
+      observacoes: data.observacoes,
+      extras: data.extras,
+    })
+
+    setProdutoAdicionado(String(produtoSelecionado.id))
+    setTimeout(() => setProdutoAdicionado(null), 600)
+
+    setModalCustomizacaoAberto(false)
+    setProdutoSelecionado(null)
   }
 
   return (
@@ -164,18 +253,20 @@ export default function Cardapio(): JSX.Element {
           🍔 Luizão Lanches
         </h1>
 
-        <span
-          style={{
-            background: aberto ? '#2ecc71' : '#e74c3c',
-            padding: '8px 16px',
-            borderRadius: 20,
-            fontSize: 13,
-            fontWeight: 600,
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-          }}
-        >
-          {aberto ? '🟢 Aberto agora' : '🔴 Fechado'}
-        </span>
+        {!statusLoading && (
+          <span
+            style={{
+              background: lojaAberta ? '#2ecc71' : '#e74c3c',
+              padding: '8px 16px',
+              borderRadius: 20,
+              fontSize: 13,
+              fontWeight: 600,
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            }}
+          >
+            {lojaAberta ? '🟢 Aberto agora' : '🔴 Fechado'}
+          </span>
+        )}
       </header>
 
       {/* TABS DE CATEGORIAS */}
@@ -225,19 +316,65 @@ export default function Cardapio(): JSX.Element {
             <CategorySection
               categoria={categoria}
               itens={lista}
-              onAddItem={handleAddItem}
+              onAddItem={handleAddItemClick}
+              lojaAberta={lojaAberta}
+              produtoAdicionado={produtoAdicionado}
             />
           </div>
         ))}
       </main>
 
-      {/* TOAST NOTIFICATION */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
+      {/* PROMPT CURTO */}
+      {produtoSelecionado && (
+        <CustomizationPrompt
+          isOpen={promptAberto}
+          onClose={() => {
+            setPromptAberto(false)
+            setProdutoSelecionado(null)
+          }}
+          onYes={handlePromptYes}
+          onNo={handlePromptNo}
+          produtoNome={produtoSelecionado.nome}
         />
+      )}
+
+      {/* MODAL DE CUSTOMIZAÇÃO */}
+      {produtoSelecionado && (
+        <ProductCustomizationModal
+          isOpen={modalCustomizacaoAberto}
+          onClose={() => {
+            setModalCustomizacaoAberto(false)
+            setProdutoSelecionado(null)
+          }}
+          produto={produtoSelecionado}
+          extrasDisponiveis={extrasDisponiveis}
+          ingredientesRemoviveis={produtoSelecionado.ingredientes || []}
+          onConfirm={handleConfirmCustomization}
+        />
+      )}
+
+      {/* AVISO SE LOJA FECHADA */}
+      {!lojaAberta && !statusLoading && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 80,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#e74c3c',
+            color: '#fff',
+            padding: '12px 24px',
+            borderRadius: 8,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            zIndex: 1500,
+            fontSize: 14,
+            fontWeight: 600,
+            maxWidth: '90%',
+            textAlign: 'center',
+          }}
+        >
+          🔴 Estamos fechados no momento. Tente novamente mais tarde.
+        </div>
       )}
 
       {/* BOTÃO CARRINHO FLUTUANTE */}

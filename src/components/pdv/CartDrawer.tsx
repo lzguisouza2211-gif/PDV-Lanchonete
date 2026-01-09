@@ -54,6 +54,7 @@ export default function CartDrawer({
           boxShadow: '-4px 0 20px rgba(0,0,0,0.15)',
           animation: 'slideIn 0.3s ease',
         }}
+        className="cart-drawer"
       >
         {/* Header */}
         <div
@@ -121,48 +122,125 @@ export default function CartDrawer({
               </p>
             </div>
           ) : (
-            items.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: 16,
-                  marginBottom: 12,
-                  background: '#f9f9f9',
-                  borderRadius: 12,
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      fontWeight: 600,
-                      marginBottom: 4,
-                      fontSize: 16,
-                    }}
-                  >
-                    {item.name}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 14,
-                      color: '#666',
-                    }}
-                  >
-                    R$ {item.price.toFixed(2)}
-                  </div>
-                </div>
-
+            items.map((item, index) => {
+              const precoBase = item.price - ((item.extras || []).reduce((sum, extra) => sum + (extra.tipo === 'add' ? extra.preco : 0), 0))
+              const precoExtras = (item.extras || []).reduce((sum, extra) => sum + (extra.tipo === 'add' ? extra.preco : 0), 0)
+              const itemTotal = item.price * item.qty
+              
+              return (
                 <div
+                  key={`${item.id}-${index}`}
                   style={{
-                    display: 'flex',
-                    gap: 12,
-                    alignItems: 'center',
-                    minWidth: 100,
-                    justifyContent: 'flex-end',
+                    padding: 16,
+                    marginBottom: 12,
+                    background: '#f9f9f9',
+                    borderRadius: 12,
+                    border: '1px solid #eee',
                   }}
                 >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          marginBottom: 4,
+                          fontSize: 16,
+                          color: '#1a1a1a',
+                        }}
+                      >
+                        {item.name}
+                      </div>
+                      {precoExtras > 0 && (
+                        <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                          Base: R$ {precoBase.toFixed(2)} + Extras: R$ {precoExtras.toFixed(2)}
+                        </div>
+                      )}
+                      {!precoExtras && (
+                        <div
+                          style={{
+                            fontSize: 14,
+                            color: '#666',
+                          }}
+                        >
+                          R$ {precoBase.toFixed(2)} cada
+                        </div>
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 700,
+                        color: '#c0392b',
+                        marginLeft: 12,
+                      }}
+                    >
+                      R$ {itemTotal.toFixed(2)}
+                    </div>
+                  </div>
+
+                  {/* Extras */}
+                  {item.extras && item.extras.length > 0 && (
+                    <div style={{ marginBottom: 8, paddingLeft: 4 }}>
+                      {item.extras
+                        .filter((e) => e.tipo === 'add')
+                        .map((extra, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              fontSize: 12,
+                              color: '#27ae60',
+                              marginBottom: 2,
+                            }}
+                          >
+                            + {extra.nome} (+R$ {extra.preco.toFixed(2)})
+                          </div>
+                        ))}
+                      {item.extras
+                        .filter((e) => e.tipo === 'remove')
+                        .map((extra, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              fontSize: 12,
+                              color: '#e74c3c',
+                              marginBottom: 2,
+                            }}
+                          >
+                            - Sem {extra.nome}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
+                  {/* Observações */}
+                  {item.observacoes && (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: '#666',
+                        fontStyle: 'italic',
+                        marginBottom: 8,
+                        padding: 8,
+                        background: '#fff',
+                        borderRadius: 6,
+                        border: '1px solid #e0e0e0',
+                      }}
+                    >
+                      📝 {item.observacoes}
+                    </div>
+                  )}
+
+                  {/* Controles de quantidade */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 12,
+                      alignItems: 'center',
+                      minWidth: 100,
+                      justifyContent: 'flex-end',
+                      marginTop: 8,
+                    }}
+                  >
                   <button
                     onClick={() => onRemove(item.id)}
                     style={{
@@ -226,9 +304,10 @@ export default function CartDrawer({
                   >
                     ➕
                   </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
 
@@ -272,6 +351,12 @@ export default function CartDrawer({
           }
           to { 
             transform: translateX(0);
+          }
+        }
+
+        @media (max-width: 768px) {
+          .cart-drawer {
+            max-width: 100% !important;
           }
         }
       `}</style>
