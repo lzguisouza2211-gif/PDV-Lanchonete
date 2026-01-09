@@ -5,8 +5,10 @@ import { useStoreStatus } from '../../hooks/useStoreStatus'
 import CategorySection from '../../components/pdv/CategorySection'
 import CartDrawer from '../../components/pdv/CartDrawer'
 import SuccessModal from '../../components/pdv/SuccessModal'
-import CategoryTabs from '../../components/pdv/CategoryTabs'
-import ProductCustomizationModal, { CustomizationData, ExtraOption } from '../../components/pdv/ProductCustomizationModal'
+import ProductCustomizationModal, {
+  CustomizationData,
+  ExtraOption,
+} from '../../components/pdv/ProductCustomizationModal'
 import CustomizationPrompt from '../../components/pdv/CustomizationPrompt'
 import { productAddonsService } from '../../services/productAddons'
 
@@ -17,7 +19,7 @@ export default function Cardapio(): JSX.Element {
 
   const [nome, setNome] = useState('')
   const [tipoEntrega, setTipoEntrega] =
-    useState<'retirada' | 'entrega'>('retirada')
+    useState<'retirada' | 'entrega' | 'local'>('retirada')
   const [endereco, setEndereco] = useState('')
   const [formaPagamento, setFormaPagamento] =
     useState<'dinheiro' | 'cartao' | 'pix'>('dinheiro')
@@ -28,30 +30,34 @@ export default function Cardapio(): JSX.Element {
   const [erro, setErro] = useState<string | null>(null)
   const [sucesso, setSucesso] = useState(false)
   const [nomeClienteSucesso, setNomeClienteSucesso] = useState('')
+
   const [categoriaAtiva, setCategoriaAtiva] = useState<string | null>(null)
   const [promptAberto, setPromptAberto] = useState(false)
   const [modalCustomizacaoAberto, setModalCustomizacaoAberto] = useState(false)
-  const [produtoSelecionado, setProdutoSelecionado] = useState<{
-    id: number
-    nome: string
-    preco: number
-    descricao?: string
-    ingredientes?: string[]
-  } | null>(null)
+
+  const [produtoSelecionado, setProdutoSelecionado] = useState<any>(null)
   const [extrasDisponiveis, setExtrasDisponiveis] = useState<ExtraOption[]>([])
   const [produtoAdicionado, setProdutoAdicionado] = useState<string | null>(null)
 
-  // Prevenir envio duplo
   const enviandoRef = useRef(false)
   const categoriaRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const total = items.reduce((s, i) => {
-    const precoBase = i.price
-    const precoExtras = (i.extras || []).reduce((sum, extra) => {
-      return sum + (extra.tipo === 'add' ? extra.preco : 0)
-    }, 0)
-    return s + (precoBase + precoExtras) * i.qty
+    const extras = (i.extras || []).reduce(
+      (sum, e) => sum + (e.tipo === 'add' ? e.preco : 0),
+      0
+    )
+    return s + (i.price + extras) * i.qty
   }, 0)
+
+  const ORDEM_CATEGORIAS = [
+    'Lanches',
+    'Macarrão',
+    'Porções',
+    'Omeletes',
+    'Bebidas',
+    'Doces',
+  ]
 
   /* =======================
      AGRUPAR POR CATEGORIA
@@ -66,64 +72,105 @@ export default function Cardapio(): JSX.Element {
     return map
   }, [itens])
 
-  const listaCategorias = useMemo(() => Object.keys(categorias), [categorias])
+  const listaCategorias = useMemo(() => {
+    return ORDEM_CATEGORIAS.filter((cat) => categorias[cat])
+  }, [categorias])
 
-  // Definir primeira categoria como ativa ao carregar
   useEffect(() => {
     if (listaCategorias.length > 0 && !categoriaAtiva) {
       setCategoriaAtiva(listaCategorias[0])
     }
   }, [listaCategorias, categoriaAtiva])
 
-  // Scroll para categoria quando selecionada
   const scrollToCategoria = (categoria: string) => {
     setCategoriaAtiva(categoria)
-    const element = categoriaRefs.current[categoria]
-    if (element) {
-      const headerOffset = 160
-      const elementPosition = element.getBoundingClientRect().top
-      const offsetPosition = elementPosition + window.pageYOffset - headerOffset
+    const el = categoriaRefs.current[categoria]
+    if (!el) return
 
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth',
-      })
-    }
+    window.scrollTo({
+      top: el.offsetTop - 140,
+      behavior: 'smooth',
+    })
   }
 
-  // Detectar categoria visível no scroll
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollPosition = window.scrollY + 200
-
-      for (const categoria of listaCategorias) {
-        const element = categoriaRefs.current[categoria]
-        if (element) {
-          const { offsetTop, offsetHeight } = element
-          if (
-            scrollPosition >= offsetTop &&
-            scrollPosition < offsetTop + offsetHeight
-          ) {
-            setCategoriaAtiva(categoria)
-            break
-          }
-        }
-      }
-    }
-
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [listaCategorias])
-
-  async function finalizar() {
-    // Prevenir envio duplo
-    if (enviandoRef.current) {
+  /* =======================
+     ADICIONAR PRODUTO
+  ======================= */
+  const handleAddItemClick = async (produto: any) => {
+    if (!lojaAberta) {
+      setErro('Estamos fechados no momento')
       return
     }
 
-    setErro(null)
-    setEnviando(true)
+    const addons = await productAddonsService.getByProduct(produto.id)
+    const extras = addons
+      .filter((a) => a.tipo === 'add')
+      .map((a) => ({
+        id: String(a.id),
+        nome: a.nome,
+        preco: Number(a.preco),
+        tipo: a.tipo,
+      }))
+
+    setExtrasDisponiveis(extras)
+    setProdutoSelecionado(produto)
+    setPromptAberto(true)
+  }
+
+  const handlePromptNo = () => {
+    if (!produtoSelecionado) return
+
+    add({
+      id: String(produtoSelecionado.id),
+      name: produtoSelecionado.nome,
+      price: produtoSelecionado.preco,
+      qty: 1,
+    })
+
+    setProdutoAdicionado(String(produtoSelecionado.id))
+    setTimeout(() => setProdutoAdicionado(null), 600)
+
+    setPromptAberto(false)
+    setProdutoSelecionado(null)
+  }
+
+  const handlePromptYes = () => {
+    setPromptAberto(false)
+    setModalCustomizacaoAberto(true)
+  }
+
+  const handleConfirmCustomization = (data: CustomizationData) => {
+    if (!produtoSelecionado) return
+
+    const precoExtras = data.extras.reduce(
+      (sum, e) => sum + (e.tipo === 'add' ? e.preco : 0),
+      0
+    )
+
+    add({
+      id: String(produtoSelecionado.id),
+      name: produtoSelecionado.nome,
+      price: produtoSelecionado.preco + precoExtras,
+      qty: 1,
+      observacoes: data.observacoes,
+      extras: data.extras,
+    })
+
+    setProdutoAdicionado(String(produtoSelecionado.id))
+    setTimeout(() => setProdutoAdicionado(null), 600)
+
+    setModalCustomizacaoAberto(false)
+    setProdutoSelecionado(null)
+  }
+
+  /* =======================
+     FINALIZAR PEDIDO
+  ======================= */
+  async function finalizar() {
+    if (enviandoRef.current) return
     enviandoRef.current = true
+    setEnviando(true)
+    setErro(null)
 
     try {
       await criarPedido({
@@ -137,181 +184,118 @@ export default function Cardapio(): JSX.Element {
       setNomeClienteSucesso(nome)
       setCarrinhoAberto(false)
       setSucesso(true)
-      
-      // Limpar formulário
       setNome('')
       setEndereco('')
       setTroco('')
     } catch (e: any) {
-      console.error('Erro ao finalizar pedido:', e)
-      const mensagemErro = e.message || 'Erro desconhecido ao enviar pedido'
-      setErro(mensagemErro)
-      // Manter carrinho aberto para tentar novamente
+      setErro(e.message || 'Erro ao enviar pedido')
     } finally {
       setEnviando(false)
       enviandoRef.current = false
     }
   }
 
-  // Abrir prompt de customização
-  const handleAddItemClick = async (produto: {
-    id: number
-    nome: string
-    preco: number
-    descricao?: string
-    ingredientes?: string[]
-  }) => {
-    if (!lojaAberta) {
-      setErro('A loja está fechada no momento. Tente novamente mais tarde.')
-      return
-    }
-    
-    // Carregar extras do banco (apenas tipo 'add' - adicionais pagos)
-    const addons = await productAddonsService.getByProduct(produto.id)
-    const extras: ExtraOption[] = addons
-      .filter((a) => a.tipo === 'add') // Só adicionais pagos
-      .map((a) => ({
-        id: String(a.id),
-        nome: a.nome,
-        preco: Number(a.preco),
-        tipo: a.tipo,
-      }))
-    
-    setExtrasDisponiveis(extras)
-    setProdutoSelecionado(produto)
-    setPromptAberto(true)
-  }
-
-  // Se não quiser customizar, adiciona direto
-  const handlePromptNo = () => {
-    if (!produtoSelecionado) return
-    
-    add({
-      id: String(produtoSelecionado.id),
-      name: produtoSelecionado.nome,
-      price: produtoSelecionado.preco,
-      qty: 1,
-    })
-    
-    setProdutoAdicionado(String(produtoSelecionado.id))
-    setTimeout(() => setProdutoAdicionado(null), 600)
-    
-    setPromptAberto(false)
-    setProdutoSelecionado(null)
-  }
-
-  // Se quiser customizar, abre modal
-  const handlePromptYes = () => {
-    setPromptAberto(false)
-    setModalCustomizacaoAberto(true)
-  }
-
-  // Confirmar customização e adicionar ao carrinho
-  const handleConfirmCustomization = (data: CustomizationData) => {
-    if (!produtoSelecionado) return
-
-    const precoBase = produtoSelecionado.preco
-    const precoExtras = data.extras.reduce((sum, extra) => {
-      return sum + (extra.tipo === 'add' ? extra.preco : 0)
-    }, 0)
-    const precoTotal = precoBase + precoExtras
-
-    add({
-      id: String(produtoSelecionado.id),
-      name: produtoSelecionado.nome,
-      price: precoTotal,
-      qty: 1,
-      observacoes: data.observacoes,
-      extras: data.extras,
-    })
-
-    setProdutoAdicionado(String(produtoSelecionado.id))
-    setTimeout(() => setProdutoAdicionado(null), 600)
-
-    setModalCustomizacaoAberto(false)
-    setProdutoSelecionado(null)
-  }
-
   return (
     <div style={{ minHeight: '100vh', background: '#fff8f2' }}>
-      {/* HEADER */}
+      {/* HEADER FIXO */}
       <header
         style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 56,               // 👈 ALTURA FIXA
+          zIndex: 300,
           background: '#c0392b',
           color: '#fff',
-          padding: '20px 24px',
+          padding: '0 16px',        // 👈 remove padding vertical
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
         }}
       >
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>
-          🍔 Luizão Lanches
-        </h1>
-
-        {!statusLoading && (
-          <span
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontWeight: 700,
+            fontSize: 18,
+          }}
+        >
+          <span style={{ fontSize: 22 }}>🍔</span>
+          <span>Luizão Lanches</span>
+        </div>
+        <span style={{ fontSize: 14, fontWeight: 500 }}>
+          {statusLoading
+            ? 'Carregando...'
+            : lojaAberta
+            ? 'Estamos abertos! 🟢'
+            : 'Fechado no momento 🔴'}
+        </span>
+      </header> 
+      {/* DROPDOWN FIXO DE CATEGORIAS */}
+      {!loading && !error && (
+        <div
             style={{
-              background: lojaAberta ? '#2ecc71' : '#e74c3c',
-              padding: '8px 16px',
-              borderRadius: 20,
-              fontSize: 13,
+            position: 'fixed',
+            top: 56,                  // 👈 MESMO valor do header
+            left: 0,
+            right: 0,
+            zIndex: 200,
+            background: '#ffffff',
+            padding: '12px 16px',
+            borderBottom: '1px solid #e5e5e5',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          }}
+        >
+          <label
+            style={{
+              display: 'block',
+              fontSize: 12,
               fontWeight: 600,
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              color: '#666',
+              marginBottom: 6,
             }}
           >
-            {lojaAberta ? '🟢 Aberto agora' : '🔴 Fechado'}
-          </span>
-        )}
-      </header>
+            📂 Escolher categoria
+          </label>
 
-      {/* TABS DE CATEGORIAS */}
-      {!loading && !error && listaCategorias.length > 0 && (
-        <CategoryTabs
-          categorias={listaCategorias}
-          categoriaAtiva={categoriaAtiva}
-          onSelectCategoria={scrollToCategoria}
-        />
+          <select
+            value={categoriaAtiva || ''}
+            onChange={(e) => scrollToCategoria(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              fontSize: 16,
+              borderRadius: 10,
+              border: '1px solid #ddd',
+              background: '#fff',
+              appearance: 'none',
+            }}
+          >
+            {listaCategorias.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
 
-      {/* CARDÁPIO */}
-      <main style={{ padding: '32px 24px', maxWidth: 1200, margin: '0 auto' }}>
-        {loading && (
-          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-            <p style={{ fontSize: 18, color: '#666' }}>Carregando cardápio...</p>
-          </div>
-        )}
-        
-        {error && (
-          <div
-            style={{
-              background: '#fee',
-              padding: 16,
-              borderRadius: 8,
-              color: '#c0392b',
-              textAlign: 'center',
-            }}
-          >
-            <p style={{ margin: 0 }}>Erro ao carregar cardápio. Tente recarregar a página.</p>
-          </div>
-        )}
-
-        {!loading && !error && Object.keys(categorias).length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-            <p style={{ fontSize: 18, color: '#666' }}>Nenhum item disponível no momento.</p>
-          </div>
-        )}
-
-        {Object.entries(categorias).map(([categoria, lista]: [string, any[]]) => (
+      {/* CONTEÚDO */}
+      <main
+        style={{
+          padding: 16,
+          paddingTop: 140,
+          maxWidth: 720,
+          margin: '0 auto',
+        }}
+      >
+        {Object.entries(categorias).map(([categoria, lista]) => (
           <div
             key={categoria}
-            ref={(el) => {
-              categoriaRefs.current[categoria] = el
-            }}
+            ref={(el) => (categoriaRefs.current[categoria] = el)}
           >
             <CategorySection
               categoria={categoria}
@@ -324,112 +308,32 @@ export default function Cardapio(): JSX.Element {
         ))}
       </main>
 
-      {/* PROMPT CURTO */}
-      {produtoSelecionado && (
-        <CustomizationPrompt
-          isOpen={promptAberto}
-          onClose={() => {
-            setPromptAberto(false)
-            setProdutoSelecionado(null)
-          }}
-          onYes={handlePromptYes}
-          onNo={handlePromptNo}
-          produtoNome={produtoSelecionado.nome}
-        />
-      )}
-
-      {/* MODAL DE CUSTOMIZAÇÃO */}
-      {produtoSelecionado && (
-        <ProductCustomizationModal
-          isOpen={modalCustomizacaoAberto}
-          onClose={() => {
-            setModalCustomizacaoAberto(false)
-            setProdutoSelecionado(null)
-          }}
-          produto={produtoSelecionado}
-          extrasDisponiveis={extrasDisponiveis}
-          ingredientesRemoviveis={produtoSelecionado.ingredientes || []}
-          onConfirm={handleConfirmCustomization}
-        />
-      )}
-
-      {/* AVISO SE LOJA FECHADA */}
-      {!lojaAberta && !statusLoading && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 80,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: '#e74c3c',
-            color: '#fff',
-            padding: '12px 24px',
-            borderRadius: 8,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            zIndex: 1500,
-            fontSize: 14,
-            fontWeight: 600,
-            maxWidth: '90%',
-            textAlign: 'center',
-          }}
-        >
-          🔴 Estamos fechados no momento. Tente novamente mais tarde.
-        </div>
-      )}
-
-      {/* BOTÃO CARRINHO FLUTUANTE */}
+      {/* BOTÃO CARRINHO */}
       {items.length > 0 && (
         <button
           onClick={() => setCarrinhoAberto(true)}
           style={{
             position: 'fixed',
-            bottom: 24,
-            left: '50%',
-            transform: 'translateX(-50%)',
+            bottom: 16,
+            left: 16,
+            right: 16,
+            zIndex: 400,
             background: '#27ae60',
             color: '#fff',
-            borderRadius: 30,
-            padding: '16px 32px',
-            fontWeight: 700,
-            fontSize: 16,
+            padding: 16,
+            borderRadius: 12,
             border: 'none',
-            boxShadow: '0 8px 24px rgba(39, 174, 96, 0.4)',
-            zIndex: 1000,
-            cursor: 'pointer',
+            fontWeight: 700,
             display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateX(-50%) scale(1.05)'
-            e.currentTarget.style.boxShadow = '0 12px 32px rgba(39, 174, 96, 0.5)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateX(-50%) scale(1)'
-            e.currentTarget.style.boxShadow = '0 8px 24px rgba(39, 174, 96, 0.4)'
+            justifyContent: 'space-between',
           }}
         >
-          <span
-            style={{
-              background: 'rgba(255,255,255,0.3)',
-              borderRadius: '50%',
-              width: 24,
-              height: 24,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 14,
-              fontWeight: 700,
-            }}
-          >
-            {items.reduce((sum, item) => sum + item.qty, 0)}
-          </span>
-          Ver carrinho • R$ {total.toFixed(2)}
+          <span>{items.length} itens</span>
+          <span>R$ {total.toFixed(2)}</span>
         </button>
       )}
 
-      {/* DRAWER CARRINHO */}
+      {/* DRAWER */}
       <CartDrawer
         isOpen={carrinhoAberto}
         onClose={() => setCarrinhoAberto(false)}
@@ -439,42 +343,47 @@ export default function Cardapio(): JSX.Element {
         onAdd={add}
       >
         <div>
+          {/* DADOS DO CLIENTE */}
+          <h3 style={{ marginBottom: 12, fontSize: 16, fontWeight: 700 }}>
+            🧾 Dados do pedido
+          </h3>
+
           <input
             placeholder="Seu nome *"
             value={nome}
             onChange={(e) => setNome(e.target.value)}
             disabled={enviando}
-            inputMode="text"
-            autoComplete="name"
             style={{
               width: '100%',
+              boxSizing: 'border-box', // 👈 ESSENCIAL
               marginBottom: 12,
               padding: 14,
               fontSize: 16,
-              borderRadius: 8,
+              borderRadius: 10,
               border: '1px solid #ddd',
-              boxSizing: 'border-box',
+              background: '#fff',
             }}
           />
 
           <select
             value={tipoEntrega}
             onChange={(e) =>
-              setTipoEntrega(e.target.value as 'retirada' | 'entrega')
+              setTipoEntrega(e.target.value as 'retirada' | 'entrega' | 'local')
             }
             disabled={enviando}
             style={{
               width: '100%',
+              boxSizing: 'border-box', // 👈 ESSENCIAL
               marginBottom: 12,
               padding: 14,
               fontSize: 16,
               borderRadius: 8,
               border: '1px solid #ddd',
-              boxSizing: 'border-box',
             }}
           >
             <option value="retirada">Retirada</option>
             <option value="entrega">Entrega</option>
+            <option value="local">Consumir no local</option>
           </select>
 
           {tipoEntrega === 'entrega' && (
@@ -483,71 +392,74 @@ export default function Cardapio(): JSX.Element {
               value={endereco}
               onChange={(e) => setEndereco(e.target.value)}
               disabled={enviando}
-              inputMode="text"
-              autoComplete="street-address"
               style={{
                 width: '100%',
+                boxSizing: 'border-box', // 👈 ESSENCIAL
                 marginBottom: 12,
                 padding: 14,
                 fontSize: 16,
                 borderRadius: 8,
                 border: '1px solid #ddd',
-                boxSizing: 'border-box',
               }}
             />
           )}
+          {tipoEntrega === 'entrega' && (
+            <>
+              <h3 style={{ margin: '16px 0 8px', fontSize: 16, fontWeight: 700 }}>
+                💳 Pagamento
+              </h3>
 
-          <select
-            value={formaPagamento}
-            onChange={(e) =>
-              setFormaPagamento(e.target.value as 'dinheiro' | 'cartao' | 'pix')
-            }
-            disabled={enviando}
-            style={{
-              width: '100%',
-              marginBottom: 12,
-              padding: 14,
-              fontSize: 16,
-              borderRadius: 8,
-              border: '1px solid #ddd',
-              boxSizing: 'border-box',
-            }}
-          >
-            <option value="dinheiro">💵 Dinheiro</option>
-            <option value="cartao">💳 Cartão</option>
-            <option value="pix">📱 PIX</option>
-          </select>
+              <select
+                value={formaPagamento}
+                onChange={(e) =>
+                  setFormaPagamento(
+                    e.target.value as 'dinheiro' | 'cartao' | 'pix'
+                  )
+                }
+                disabled={enviando}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box', // 👈 ESSENCIAL
+                  marginBottom: 12,
+                  padding: 14,
+                  fontSize: 16,
+                  borderRadius: 8,
+                  border: '1px solid #ddd',
+                }}
+              >
+                <option value="dinheiro">💵 Dinheiro</option>
+                <option value="cartao">💳 Cartão</option>
+                <option value="pix">📱 PIX</option>  
+              </select>
 
-          {formaPagamento === 'dinheiro' && (
+          {formaPagamento === 'dinheiro' && tipoEntrega !== 'local' && (
             <input
               placeholder="Troco para quanto?"
               value={troco}
               onChange={(e) => setTroco(e.target.value)}
               disabled={enviando}
-              inputMode="decimal"
-              type="text"
-              pattern="[0-9]*"
               style={{
                 width: '100%',
+                boxSizing: 'border-box', // 👈 ESSENCIAL
                 marginBottom: 12,
                 padding: 14,
                 fontSize: 16,
                 borderRadius: 8,
                 border: '1px solid #ddd',
-                boxSizing: 'border-box',
               }}
             />
           )}
+          </>)}
 
           {erro && (
             <div
               style={{
-                background: '#fee',
+                background: '#fdecea',
                 color: '#c0392b',
                 padding: 12,
                 borderRadius: 8,
                 marginBottom: 12,
-                fontSize: 14,
+                border: '1px solid #f5c6cb',
               }}
             >
               {erro}
@@ -560,7 +472,7 @@ export default function Cardapio(): JSX.Element {
             style={{
               width: '100%',
               padding: 16,
-              borderRadius: 8,
+              borderRadius: 10,
               border: 'none',
               background:
                 enviando || !nome.trim() || items.length === 0
@@ -569,51 +481,50 @@ export default function Cardapio(): JSX.Element {
               color: '#fff',
               fontWeight: 700,
               fontSize: 16,
-              cursor:
-                enviando || !nome.trim() || items.length === 0
-                  ? 'not-allowed'
-                  : 'pointer',
-              touchAction: 'manipulation',
-              minHeight: 52,
-              transition: 'background 0.2s ease',
             }}
           >
-            {enviando ? (
-              <span>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    animation: 'spin 1s linear infinite',
-                  }}
-                >
-                  ⏳
-                </span>{' '}
-                Enviando pedido...
-              </span>
-            ) : (
-              'Finalizar pedido'
-            )}
+            {enviando ? 'Enviando pedido...' : 'Finalizar pedido'}
           </button>
-        </div>
+        </div>  
       </CartDrawer>
 
-      {/* MODAL SUCESSO */}
-      {sucesso && (
-        <SuccessModal
+
+      {/* =======================
+          MODAIS (NO FINAL)
+         ======================= */}
+      {produtoSelecionado && (
+        <CustomizationPrompt
+          isOpen={promptAberto}
+          produtoNome={produtoSelecionado.nome}
+          onNo={handlePromptNo}
+          onYes={handlePromptYes}
           onClose={() => {
-            setSucesso(false)
-            setNomeClienteSucesso('')
+            setPromptAberto(false)
+            setProdutoSelecionado(null)
           }}
-          cliente={nomeClienteSucesso}
         />
       )}
 
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+      {produtoSelecionado && (
+        <ProductCustomizationModal
+          isOpen={modalCustomizacaoAberto}
+          produto={produtoSelecionado}
+          extrasDisponiveis={extrasDisponiveis}
+          ingredientesRemoviveis={produtoSelecionado.ingredientes || []}
+          onConfirm={handleConfirmCustomization}
+          onClose={() => {
+            setModalCustomizacaoAberto(false)
+            setProdutoSelecionado(null)
+          }}
+        />
+      )}
+
+      {sucesso && (
+        <SuccessModal
+          cliente={nomeClienteSucesso}
+          onClose={() => setSucesso(false)}
+        />
+      )}
     </div>
   )
 }

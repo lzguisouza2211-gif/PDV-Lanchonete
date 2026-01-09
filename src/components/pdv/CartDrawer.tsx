@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { CartItem } from '../../store/useCart'
 
 type CartDrawerProps = {
@@ -20,302 +20,225 @@ export default function CartDrawer({
   onAdd,
   children,
 }: CartDrawerProps) {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   return (
     <>
-      {/* Overlay */}
+      {/* OVERLAY */}
       <div
         onClick={onClose}
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0,0,0,0.5)',
+          background: 'rgba(0,0,0,0.45)',
           zIndex: 2000,
-          animation: 'fadeIn 0.2s ease',
         }}
       />
 
-      {/* Drawer */}
-      <div
+      {/* DRAWER */}
+      <aside
         onClick={(e) => e.stopPropagation()}
+        className="cart-drawer"
         style={{
           position: 'fixed',
           top: 0,
           right: 0,
           bottom: 0,
-          background: '#fff',
           width: '100%',
           maxWidth: 420,
-          height: '100%',
+          background: '#fff',
           zIndex: 2001,
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '-4px 0 20px rgba(0,0,0,0.15)',
-          animation: 'slideIn 0.3s ease',
+          boxShadow: '-2px 0 12px rgba(0,0,0,0.12)',
         }}
-        className="cart-drawer"
       >
-        {/* Header */}
-        <div
+        {/* HEADER */}
+        <header
           style={{
-            padding: 20,
+            padding: '16px 20px',
             borderBottom: '1px solid #eee',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             background: '#fff',
-            position: 'sticky',
-            top: 0,
-            zIndex: 10,
           }}
         >
-          <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
             Seu pedido
           </h3>
           <button
             onClick={onClose}
             style={{
-              background: 'transparent',
+              background: '#f6f6f6',
               border: 'none',
-              fontSize: 24,
+              borderRadius: 10,
+              width: 36,
+              height: 36,
+              fontSize: 18,
               cursor: 'pointer',
-              padding: '4px 8px',
-              minWidth: 44,
-              minHeight: 44,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 8,
-              transition: 'background 0.2s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f5f5f5'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent'
             }}
           >
             ✕
           </button>
-        </div>
+        </header>
 
-        {/* Items List */}
-        <div
+        {/* ITENS */}
+        <section
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '20px',
+            padding: '16px 20px',
           }}
         >
           {items.length === 0 ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '40px 20px',
-                color: '#999',
-              }}
-            >
-              <p style={{ fontSize: 18, margin: 0 }}>Carrinho vazio</p>
-              <p style={{ fontSize: 14, margin: '8px 0 0 0' }}>
+            <div style={{ textAlign: 'center', color: '#999', marginTop: 48 }}>
+              <p style={{ fontSize: 16, marginBottom: 4 }}>
+                Carrinho vazio
+              </p>
+              <p style={{ fontSize: 13 }}>
                 Adicione itens do cardápio
               </p>
             </div>
           ) : (
             items.map((item, index) => {
-              const precoBase = item.price - ((item.extras || []).reduce((sum, extra) => sum + (extra.tipo === 'add' ? extra.preco : 0), 0))
-              const precoExtras = (item.extras || []).reduce((sum, extra) => sum + (extra.tipo === 'add' ? extra.preco : 0), 0)
-              const itemTotal = item.price * item.qty
-              
+              const extrasAdd = (item.extras || []).filter(
+                (e) => e.tipo === 'add'
+              )
+              const extrasRemove = (item.extras || []).filter(
+                (e) => e.tipo === 'remove'
+              )
+
               return (
                 <div
                   key={`${item.id}-${index}`}
                   style={{
-                    padding: 16,
-                    marginBottom: 12,
-                    background: '#f9f9f9',
-                    borderRadius: 12,
-                    border: '1px solid #eee',
+                    paddingBottom: 16,
+                    marginBottom: 16,
+                    borderBottom: '1px solid #eee',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                    <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontWeight: 600,
-                          marginBottom: 4,
-                          fontSize: 16,
-                          color: '#1a1a1a',
-                        }}
-                      >
-                        {item.name}
-                      </div>
-                      {precoExtras > 0 && (
-                        <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
-                          Base: R$ {precoBase.toFixed(2)} + Extras: R$ {precoExtras.toFixed(2)}
-                        </div>
-                      )}
-                      {!precoExtras && (
-                        <div
-                          style={{
-                            fontSize: 14,
-                            color: '#666',
-                          }}
-                        >
-                          R$ {precoBase.toFixed(2)} cada
-                        </div>
-                      )}
-                    </div>
-                    <div
+                  {/* NOME + PREÇO */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: 6,
+                    }}
+                  >
+                    <strong style={{ fontSize: 15, fontWeight: 600 }}>
+                      {item.name}
+                    </strong>
+                    <strong
                       style={{
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: 700,
                         color: '#c0392b',
-                        marginLeft: 12,
                       }}
                     >
-                      R$ {itemTotal.toFixed(2)}
-                    </div>
+                      R$ {(item.price * item.qty).toFixed(2)}
+                    </strong>
                   </div>
 
-                  {/* Extras */}
-                  {item.extras && item.extras.length > 0 && (
-                    <div style={{ marginBottom: 8, paddingLeft: 4 }}>
-                      {item.extras
-                        .filter((e) => e.tipo === 'add')
-                        .map((extra, idx) => (
-                          <div
-                            key={idx}
-                            style={{
-                              fontSize: 12,
-                              color: '#27ae60',
-                              marginBottom: 2,
-                            }}
-                          >
-                            + {extra.nome} (+R$ {extra.preco.toFixed(2)})
-                          </div>
-                        ))}
-                      {item.extras
-                        .filter((e) => e.tipo === 'remove')
-                        .map((extra, idx) => (
-                          <div
-                            key={idx}
-                            style={{
-                              fontSize: 12,
-                              color: '#e74c3c',
-                              marginBottom: 2,
-                            }}
-                          >
-                            - Sem {extra.nome}
-                          </div>
-                        ))}
+                  {/* EXTRAS */}
+                  {extrasAdd.map((e, i) => (
+                    <div
+                      key={i}
+                      style={{ fontSize: 12, color: '#27ae60' }}
+                    >
+                      + {e.nome}
                     </div>
-                  )}
+                  ))}
+                  {extrasRemove.map((e, i) => (
+                    <div
+                      key={i}
+                      style={{ fontSize: 12, color: '#e74c3c' }}
+                    >
+                      – Sem {e.nome}
+                    </div>
+                  ))}
 
-                  {/* Observações */}
+                  {/* OBSERVAÇÕES */}
                   {item.observacoes && (
                     <div
                       style={{
                         fontSize: 12,
                         color: '#666',
+                        marginTop: 6,
                         fontStyle: 'italic',
-                        marginBottom: 8,
-                        padding: 8,
-                        background: '#fff',
-                        borderRadius: 6,
-                        border: '1px solid #e0e0e0',
                       }}
                     >
                       📝 {item.observacoes}
                     </div>
                   )}
 
-                  {/* Controles de quantidade */}
+                  {/* CONTROLES */}
                   <div
                     style={{
                       display: 'flex',
-                      gap: 12,
-                      alignItems: 'center',
-                      minWidth: 100,
                       justifyContent: 'flex-end',
-                      marginTop: 8,
-                    }}
-                  >
-                  <button
-                    onClick={() => onRemove(item.id)}
-                    style={{
-                      minWidth: 44,
-                      minHeight: 44,
-                      borderRadius: 8,
-                      border: '1px solid #ddd',
-                      background: '#fff',
-                      fontSize: 20,
-                      cursor: 'pointer',
-                      display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s ease',
-                      touchAction: 'manipulation',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#fee'
-                      e.currentTarget.style.borderColor = '#fcc'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#fff'
-                      e.currentTarget.style.borderColor = '#ddd'
+                      gap: 10,
+                      marginTop: 10,
                     }}
                   >
-                    ➖
-                  </button>
-                  <strong
-                    style={{
-                      minWidth: 30,
-                      textAlign: 'center',
-                      fontSize: 18,
-                    }}
-                  >
-                    {item.qty}
-                  </strong>
-                  <button
-                    onClick={() => onAdd({ ...item, qty: 1 })}
-                    style={{
-                      minWidth: 44,
-                      minHeight: 44,
-                      borderRadius: 8,
-                      border: '1px solid #ddd',
-                      background: '#fff',
-                      fontSize: 20,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s ease',
-                      touchAction: 'manipulation',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#efe'
-                      e.currentTarget.style.borderColor = '#cfc'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#fff'
-                      e.currentTarget.style.borderColor = '#ddd'
-                    }}
-                  >
-                    ➕
-                  </button>
+                    <button
+                      onClick={() => onRemove(item.id)}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 8,
+                        border: '1px solid #ddd',
+                        background: '#fff',
+                        fontSize: 18,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      −
+                    </button>
+
+                    <span style={{ minWidth: 24, textAlign: 'center' }}>
+                      {item.qty}
+                    </span>
+
+                    <button
+                      onClick={() => onAdd({ ...item, qty: 1 })}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 8,
+                        border: '1px solid #ddd',
+                        background: '#fff',
+                        fontSize: 18,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
               )
             })
           )}
-        </div>
+        </section>
 
-        {/* Footer with Total and Form */}
-        <div
+        {/* FOOTER */}
+        <footer
           style={{
-            borderTop: '2px solid #eee',
-            padding: 20,
+            padding: '16px 20px',
+            borderTop: '1px solid #eee',
             background: '#fff',
           }}
         >
@@ -323,44 +246,33 @@ export default function CartDrawer({
             style={{
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 20,
-              paddingBottom: 16,
-              borderBottom: '1px solid #eee',
+              marginBottom: 12,
             }}
           >
-            <strong style={{ fontSize: 18 }}>Total:</strong>
-            <strong style={{ fontSize: 24, color: '#c0392b' }}>
+            <strong>Total</strong>
+            <strong
+              style={{
+                fontSize: 20,
+                fontWeight: 700,
+                color: '#c0392b',
+              }}
+            >
               R$ {total.toFixed(2)}
             </strong>
           </div>
 
+          {/* FORMULÁRIO */}
           {children}
-        </div>
-      </div>
+        </footer>
+      </aside>
 
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes slideIn {
-          from { 
-            transform: translateX(100%);
-          }
-          to { 
-            transform: translateX(0);
-          }
-        }
-
         @media (max-width: 768px) {
           .cart-drawer {
-            max-width: 100% !important;
+            max-width: 100%;
           }
         }
       `}</style>
     </>
   )
 }
-
