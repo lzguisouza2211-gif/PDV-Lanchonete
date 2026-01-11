@@ -10,7 +10,7 @@ export default function Sidebar() {
   return (
     <aside
       style={{
-        width: 260,
+        width: 130,
         background: '#fff',
         borderRight: '1px solid #e5e7eb',
         padding: 24,

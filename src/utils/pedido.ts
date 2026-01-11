@@ -13,7 +13,6 @@ export type PedidoPayload = {
     nome: string
     preco: number
     quantidade: number
-    adicionais?: any[]
     observacoes?: string
     extras?: Array<{
       nome: string
@@ -25,7 +24,6 @@ export type PedidoPayload = {
 
 /**
  * Normaliza e valida o payload do pedido antes de enviar
- * Garante formato consistente e tipos corretos
  */
 export function normalizePedidoPayload(
   input: {
@@ -38,8 +36,7 @@ export function normalizePedidoPayload(
   },
   items: CartItem[]
 ): PedidoPayload {
-  // Validações
-  if (!input.cliente || input.cliente.trim().length === 0) {
+  if (!input.cliente?.trim()) {
     throw new Error('Nome do cliente é obrigatório')
   }
 
@@ -47,39 +44,29 @@ export function normalizePedidoPayload(
     throw new Error('Carrinho vazio')
   }
 
-  // Calcula total incluindo extras
   const total = items.reduce((sum, item) => {
-    const precoBase = item.price
-    const precoExtras = (item.extras || []).reduce((extraSum, extra) => {
-      return extraSum + (extra.tipo === 'add' ? extra.preco : 0)
-    }, 0)
-    return sum + (precoBase + precoExtras) * item.qty
+    const extras = (item.extras || []).reduce(
+      (s, e) => s + (e.tipo === 'add' ? e.preco : 0),
+      0
+    )
+    return sum + (item.price + extras) * item.qty
   }, 0)
 
   if (total <= 0) {
-    throw new Error('Total do pedido deve ser maior que zero')
+    throw new Error('Total inválido')
   }
 
-  // Normaliza troco
   let troco: number | null = null
   if (input.troco) {
-    const trocoNum = typeof input.troco === 'string' ? parseFloat(input.troco) : input.troco
-    if (!isNaN(trocoNum) && trocoNum > 0) {
-      troco = trocoNum
-    }
+    const t = Number(input.troco)
+    if (!isNaN(t) && t > 0) troco = t
   }
 
-  // Normaliza endereço (só se for entrega)
   const endereco =
     input.tipoEntrega === 'entrega' && input.endereco
       ? input.endereco.trim()
       : null
 
-  if (input.tipoEntrega === 'entrega' && !endereco) {
-    throw new Error('Endereço é obrigatório para entrega')
-  }
-
-  // Monta payload normalizado
   return {
     cliente: input.cliente.trim(),
     tipoentrega: input.tipoEntrega || null,
@@ -93,10 +80,8 @@ export function normalizePedidoPayload(
       nome: item.name,
       preco: Number(item.price),
       quantidade: Number(item.qty),
-      adicionais: [],
-      observacoes: item.observacoes || undefined,
-      extras: item.extras || undefined,
+      observacoes: item.observacoes,
+      extras: item.extras,
     })),
   }
 }
-
