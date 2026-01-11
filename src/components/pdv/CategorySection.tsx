@@ -5,6 +5,7 @@ type CategorySectionProps = {
   categoria: string
   itens: Array<{
     id: number
+    categoria: string
     nome: string
     preco: number
     descricao?: string
@@ -65,6 +66,7 @@ export default function CategorySection({
                 preco: item.preco,
                 descricao: item.descricao,
                 ingredientes: item.ingredientes || [],
+                categoria: item.categoria,
               })
             }
             lojaAberta={lojaAberta}

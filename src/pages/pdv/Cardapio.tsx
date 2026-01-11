@@ -56,6 +56,7 @@ export default function Cardapio(): JSX.Element {
     'Porções',
     'Omeletes',
     'Bebidas',
+    'Cervejas',
     'Doces',
   ]
 
@@ -96,25 +97,48 @@ export default function Cardapio(): JSX.Element {
   /* =======================
      ADICIONAR PRODUTO
   ======================= */
+  // Categorias que permitem customização completa
+  const CATEGORIAS_CUSTOMIZAVEIS = ['Lanches', 'Macarrão', 'Omeletes']
+
   const handleAddItemClick = async (produto: any) => {
     if (!lojaAberta) {
       setErro('Estamos fechados no momento')
       return
     }
 
-    const addons = await productAddonsService.getByProduct(produto.id)
-    const extras = addons
-      .filter((a) => a.tipo === 'add')
-      .map((a) => ({
-        id: String(a.id),
-        nome: a.nome,
-        preco: Number(a.preco),
-        tipo: a.tipo,
-      }))
+    // Debug: mostrar categoria, extras e ingredientes
+    console.log('[DEBUG] Produto:', produto.nome, '| Categoria:', produto.categoria)
 
-    setExtrasDisponiveis(extras)
-    setProdutoSelecionado(produto)
-    setPromptAberto(true)
+    if (CATEGORIAS_CUSTOMIZAVEIS.includes(produto.categoria)) {
+      const addons = await productAddonsService.getByProduct(produto.id)
+      const extras = addons
+        .filter((a) => a.tipo === 'add')
+        .map((a) => ({
+          id: String(a.id),
+          nome: a.nome,
+          preco: Number(a.preco),
+          tipo: a.tipo,
+        }))
+      const temExtras = extras.length > 0
+      const temRemoviveis = Array.isArray(produto.ingredientes) && produto.ingredientes.length > 0
+
+      console.log('[DEBUG] Extras:', extras)
+      console.log('[DEBUG] Ingredientes removíveis:', produto.ingredientes)
+
+      setExtrasDisponiveis(extras)
+      setProdutoSelecionado(produto)
+      if (temExtras || temRemoviveis) {
+        setPromptAberto(true)
+      } else {
+        // Produto da categoria, mas sem extras/removíveis: só observação
+        setModalCustomizacaoAberto(true)
+      }
+    } else {
+      // Para outros produtos, só permite observação
+      setExtrasDisponiveis([])
+      setProdutoSelecionado(produto)
+      setModalCustomizacaoAberto(true)
+    }
   }
 
   const handlePromptNo = () => {
@@ -299,7 +323,7 @@ export default function Cardapio(): JSX.Element {
           >
             <CategorySection
               categoria={categoria}
-              itens={lista}
+              itens={Array.isArray(lista) ? lista : []}
               onAddItem={handleAddItemClick}
               lojaAberta={lojaAberta}
               produtoAdicionado={produtoAdicionado}
@@ -492,7 +516,8 @@ export default function Cardapio(): JSX.Element {
       {/* =======================
           MODAIS (NO FINAL)
          ======================= */}
-      {produtoSelecionado && (
+      {/* Modal de customização só para categorias customizáveis */}
+      {produtoSelecionado && CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) && (
         <CustomizationPrompt
           isOpen={promptAberto}
           produtoNome={produtoSelecionado.nome}
@@ -505,12 +530,13 @@ export default function Cardapio(): JSX.Element {
         />
       )}
 
+      {/* Modal de customização: se categoria customizável, mostra tudo; senão, só observações */}
       {produtoSelecionado && (
         <ProductCustomizationModal
           isOpen={modalCustomizacaoAberto}
           produto={produtoSelecionado}
-          extrasDisponiveis={extrasDisponiveis}
-          ingredientesRemoviveis={produtoSelecionado.ingredientes || []}
+          extrasDisponiveis={CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) ? extrasDisponiveis : []}
+          ingredientesRemoviveis={CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) ? (produtoSelecionado.ingredientes || []) : []}
           onConfirm={handleConfirmCustomization}
           onClose={() => {
             setModalCustomizacaoAberto(false)

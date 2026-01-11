@@ -16,6 +16,8 @@ class CardapioService {
       .from('cardapio')
       .select('*')
       .eq('ativo', true)
+      .order('ordem_categoria', { ascending: true })
+      .order('nome', { ascending: true })
 
     if (error) {
       throw error
