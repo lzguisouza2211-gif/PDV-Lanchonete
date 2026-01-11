@@ -10,13 +10,7 @@ type CategorySectionProps = {
     descricao?: string
     ingredientes?: string[]
   }>
-  onAddItem: (produto: {
-    id: number
-    nome: string
-    preco: number
-    descricao?: string
-    ingredientes?: string[]
-  }) => void
+  onAddItem: (produto: any) => void
   lojaAberta: boolean
   produtoAdicionado?: string | null
 }
@@ -29,28 +23,18 @@ export default function CategorySection({
   produtoAdicionado,
 }: CategorySectionProps) {
   return (
-    <section
-      style={{
-        marginBottom: 48,
-        scrollMarginTop: 180,
-      }}
-      id={`categoria-${categoria.toLowerCase().replace(/\s+/g, '-')}`}
-    >
+    <section style={{ marginBottom: 32 }}>
       <div
         style={{
-          position: 'sticky',
-          top: 160,
-          background: '#fff8f2',
-          padding: '16px 0',
-          marginBottom: 24,
-          zIndex: 10,
-          borderBottom: '2px solid #c0392b',
+          padding: '12px 0',
+          marginBottom: 16,
+          borderBottom: '1px solid #eee',
         }}
       >
         <h2
           style={{
             margin: 0,
-            fontSize: 28,
+            fontSize: 20,
             fontWeight: 700,
             color: '#c0392b',
             textTransform: 'capitalize',
@@ -74,13 +58,15 @@ export default function CategorySection({
             nome={item.nome}
             preco={item.preco}
             descricao={item.descricao}
-            onAdd={() => onAddItem({
-              id: item.id,
-              nome: item.nome,
-              preco: item.preco,
-              descricao: item.descricao,
-              ingredientes: item.ingredientes || [],
-            })}
+            onAdd={() =>
+              onAddItem({
+                id: item.id,
+                nome: item.nome,
+                preco: item.preco,
+                descricao: item.descricao,
+                ingredientes: item.ingredientes || [],
+              })
+            }
             lojaAberta={lojaAberta}
             justAdded={produtoAdicionado === String(item.id)}
           />
@@ -89,4 +75,3 @@ export default function CategorySection({
     </section>
   )
 }
-
