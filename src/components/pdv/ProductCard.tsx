@@ -9,6 +9,7 @@ type ProductCardProps = {
   isAdding?: boolean
   lojaAberta?: boolean
   justAdded?: boolean
+  ingredientesIndisponiveis?: string[]
 }
 
 export default function ProductCard({
@@ -19,6 +20,7 @@ export default function ProductCard({
   isAdding = false,
   lojaAberta = true,
   justAdded = false,
+  ingredientesIndisponiveis = [],
 }: ProductCardProps) {
   const handleAdd = () => {
     if (lojaAberta) {
@@ -100,6 +102,23 @@ export default function ProductCard({
           >
             {descricao}
           </p>
+        )}
+        {ingredientesIndisponiveis.length > 0 && (
+          <div
+            style={{
+              marginTop: 8,
+              padding: '8px 10px',
+              borderRadius: 10,
+              background: '#fff7ed',
+              border: '1px dashed #f39c12',
+              color: '#b35c00',
+              fontSize: 12,
+              fontWeight: 600,
+              lineHeight: 1.3,
+            }}
+          >
+            Hoje estamos sem: {ingredientesIndisponiveis.join(', ')}.
+          </div>
         )}
       </div>
 

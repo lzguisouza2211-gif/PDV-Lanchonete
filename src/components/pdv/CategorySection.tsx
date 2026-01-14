@@ -14,6 +14,7 @@ type CategorySectionProps = {
   onAddItem: (produto: any) => void
   lojaAberta: boolean
   produtoAdicionado?: string | null
+  ingredientesIndisponiveisMap?: Record<string, string[]>
 }
 
 export default function CategorySection({
@@ -22,6 +23,7 @@ export default function CategorySection({
   onAddItem,
   lojaAberta,
   produtoAdicionado,
+  ingredientesIndisponiveisMap = {},
 }: CategorySectionProps) {
   return (
     <section style={{ marginBottom: 32 }}>
@@ -59,6 +61,7 @@ export default function CategorySection({
             nome={item.nome}
             preco={item.preco}
             descricao={item.descricao}
+            ingredientesIndisponiveis={ingredientesIndisponiveisMap[String(item.id)] || []}
             onAdd={() =>
               onAddItem({
                 id: item.id,

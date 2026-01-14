@@ -11,9 +11,15 @@ import ProductCustomizationModal, {
 } from '../../components/pdv/ProductCustomizationModal'
 import CustomizationPrompt from '../../components/pdv/CustomizationPrompt'
 import { productAddonsService } from '../../services/productAddons'
+import { cardapioService } from '../../services/api/cardapio.service'
+import PixKeyDisplay from '../../components/pdv/PixKeyDisplay'
+import { PIX_CONFIG } from '../../config/pix'
+import { useIngredientesIndisponiveisRealtime } from '../../hooks/useIngredientesIndisponiveisRealtime'
+import { useProdutosDisponibilidadeRealtime } from '../../hooks/useProdutosDisponibilidadeRealtime'
 
 export default function Cardapio(): JSX.Element {
-  const { itens, loading, error } = useCardapio()
+  const { itens: itensCardapio, loading, error, recarregar } = useCardapio()
+  const [itens, setItens] = useState<any[]>([])
   const { items, add, remove, criarPedido } = useCartWithPedidos()
   const { isOpen: lojaAberta, loading: statusLoading } = useStoreStatus()
 
@@ -38,6 +44,7 @@ export default function Cardapio(): JSX.Element {
   const [produtoSelecionado, setProdutoSelecionado] = useState<any>(null)
   const [extrasDisponiveis, setExtrasDisponiveis] = useState<ExtraOption[]>([])
   const [produtoAdicionado, setProdutoAdicionado] = useState<string | null>(null)
+  const [ingredientesIndisponiveisHoje, setIngredientesIndisponiveisHoje] = useState<Record<string, string[]>>({})
 
   const enviandoRef = useRef(false)
   const categoriaRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -49,6 +56,11 @@ export default function Cardapio(): JSX.Element {
     )
     return s + (i.price + extras) * i.qty
   }, 0)
+
+  // Sincroniza itens do hook com estado local para permitir atualizações em tempo real
+  useEffect(() => {
+    setItens(itensCardapio)
+  }, [itensCardapio])
 
   const ORDEM_CATEGORIAS = [
     'Lanches',
@@ -82,6 +94,30 @@ export default function Cardapio(): JSX.Element {
       setCategoriaAtiva(listaCategorias[0])
     }
   }, [listaCategorias, categoriaAtiva])
+
+  useEffect(() => {
+    const carregarIndisponiveis = async () => {
+      try {
+        const mapa = await cardapioService.listarIngredientesIndisponiveisHoje()
+        setIngredientesIndisponiveisHoje(mapa)
+      } catch (err) {
+        console.error('Erro ao carregar ingredientes indisponíveis para hoje:', err)
+      }
+    }
+
+    carregarIndisponiveis()
+  }, [])
+
+  // Realtime/Polling para indisponibilidade de ingredientes
+  useIngredientesIndisponiveisRealtime((mapa) => {
+    setIngredientesIndisponiveisHoje(mapa)
+  })
+
+  // Realtime/Polling para disponibilidade de produtos (habilitar/desabilitar)
+  useProdutosDisponibilidadeRealtime((itensAtualizados) => {
+    setItens(itensAtualizados)
+    console.log('📡 Cardápio atualizado em tempo real:', itensAtualizados.length, 'itens')
+  })
 
   const scrollToCategoria = (categoria: string) => {
     setCategoriaAtiva(categoria)
@@ -327,6 +363,7 @@ export default function Cardapio(): JSX.Element {
               onAddItem={handleAddItemClick}
               lojaAberta={lojaAberta}
               produtoAdicionado={produtoAdicionado}
+              ingredientesIndisponiveisMap={ingredientesIndisponiveisHoje}
             />
           </div>
         ))}
@@ -456,6 +493,15 @@ export default function Cardapio(): JSX.Element {
                 <option value="pix">📱 PIX</option>  
               </select>
 
+          {formaPagamento === 'pix' && (
+            <PixKeyDisplay
+              pixKey={PIX_CONFIG.key}
+              keyType={PIX_CONFIG.keyType}
+              recipientName={PIX_CONFIG.recipientName}
+              amount={total}
+            />
+          )}
+
           {formaPagamento === 'dinheiro' && tipoEntrega !== 'local' && (
             <input
               placeholder="Troco para quanto?"
@@ -537,6 +583,7 @@ export default function Cardapio(): JSX.Element {
           produto={produtoSelecionado}
           extrasDisponiveis={CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) ? extrasDisponiveis : []}
           ingredientesRemoviveis={CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) ? (produtoSelecionado.ingredientes || []) : []}
+          ingredientesIndisponiveis={ingredientesIndisponiveisHoje[String(produtoSelecionado.id)] || []}
           onConfirm={handleConfirmCustomization}
           onClose={() => {
             setModalCustomizacaoAberto(false)
