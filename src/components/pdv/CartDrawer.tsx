@@ -121,6 +121,10 @@ export default function CartDrawer({
                 (e) => e.tipo === 'remove'
               )
 
+              // Categorias que não permitem +/- no carrinho
+              const CATEGORIAS_SEM_AJUSTE = ['Lanches', 'Macarrão', 'Omeletes']
+              const naoPermiteAjuste = item.categoria && CATEGORIAS_SEM_AJUSTE.includes(item.categoria)
+
               return (
                 <div
                   key={`${item.id}-${index}`}
@@ -200,49 +204,82 @@ export default function CartDrawer({
                   )}
 
                   {/* CONTROLES */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                      alignItems: 'center',
-                      gap: 10,
-                      marginTop: 10,
-                    }}
-                  >
-                    <button
-                      onClick={() => onRemove(item.id)}
+                  {naoPermiteAjuste ? (
+                    // Categorias customizáveis: apenas mostra quantidade e botão de remover
+                    <div
                       style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 8,
-                        border: '1px solid #ddd',
-                        background: '#fff',
-                        fontSize: 18,
-                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        alignItems: 'center',
+                        gap: 10,
+                        marginTop: 10,
                       }}
                     >
-                      −
-                    </button>
-
-                    <span style={{ minWidth: 24, textAlign: 'center' }}>
-                      {item.qty}
-                    </span>
-
-                    <button
-                      onClick={() => onAdd({ ...item, qty: 1 })}
+                      <span style={{ fontSize: 13, color: '#666', marginRight: 'auto' }}>
+                        Qtd: {item.qty}
+                      </span>
+                      <button
+                        onClick={() => onRemove(item.id)}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: 8,
+                          border: '1px solid #e74c3c',
+                          background: '#fff',
+                          color: '#e74c3c',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        🗑️ Remover
+                      </button>
+                    </div>
+                  ) : (
+                    // Outras categorias: permite aumentar/diminuir quantidade
+                    <div
                       style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 8,
-                        border: '1px solid #ddd',
-                        background: '#fff',
-                        fontSize: 18,
-                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        alignItems: 'center',
+                        gap: 10,
+                        marginTop: 10,
                       }}
                     >
-                      +
-                    </button>
-                  </div>
+                      <button
+                        onClick={() => onRemove(item.id)}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 8,
+                          border: '1px solid #ddd',
+                          background: '#fff',
+                          fontSize: 18,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        −
+                      </button>
+
+                      <span style={{ minWidth: 24, textAlign: 'center' }}>
+                        {item.qty}
+                      </span>
+
+                      <button
+                        onClick={() => onAdd({ ...item, qty: 1 })}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 8,
+                          border: '1px solid #ddd',
+                          background: '#fff',
+                          fontSize: 18,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })
