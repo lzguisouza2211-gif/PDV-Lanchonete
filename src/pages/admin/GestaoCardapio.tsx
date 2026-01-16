@@ -31,7 +31,7 @@ function GestaoCardapio() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string>('');
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string>('Todos');
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
   const [editingPriceValue, setEditingPriceValue] = useState('');
   const [ingredientesIndisponiveis, setIngredientesIndisponiveis] = useState<IngredientesIndisponivelMap>({});
@@ -57,12 +57,6 @@ function GestaoCardapio() {
       // Carregar ingredientes indisponíveis
       const indisponiveis = await cardapioService.listarIngredientesIndisponiveisHoje();
       setIngredientesIndisponiveis(indisponiveis);
-      
-      if (produtosData && produtosData.length > 0) {
-        const categoriasUnicas = Array.from(new Set(produtosData.map(p => p.categoria)));
-        const primeiraCategoriaPreferencial = ORDEM_CATEGORIAS.find(cat => categoriasUnicas.includes(cat));
-        setCategoriaSelecionada(primeiraCategoriaPreferencial || categoriasUnicas[0]);
-      }
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
       alert('Erro ao carregar produtos');
@@ -152,18 +146,20 @@ function GestaoCardapio() {
     const categoriasUnicas = Array.from(new Set(produtos.map(p => p.categoria)));
     const ordenadas = ORDEM_CATEGORIAS.filter(cat => categoriasUnicas.includes(cat));
     const restantes = categoriasUnicas.filter(cat => !ORDEM_CATEGORIAS.includes(cat));
-    return [...ordenadas, ...restantes];
+    return ['Todos', ...ordenadas, ...restantes];
   }, [produtos]);
 
   const produtosFiltrados = produtos.filter(produto => {
-    const matchesCategoria = produto.categoria === categoriaSelecionada;
+    const matchesCategoria = categoriaSelecionada === 'Todos' || produto.categoria === categoriaSelecionada;
     const matchesSearch = searchTerm === '' || 
-                         produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         produto.descricao.toLowerCase().includes(searchTerm.toLowerCase());
+                         produto.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         produto.descricao?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategoria && matchesSearch;
   });
 
-  const produtosCategoria = produtos.filter(p => p.categoria === categoriaSelecionada);
+  const produtosCategoria = categoriaSelecionada === 'Todos' 
+    ? produtos 
+    : produtos.filter(p => p.categoria === categoriaSelecionada);
   const disponiveis = produtosCategoria.filter(p => p.disponivel).length;
 
   if (loading) {
@@ -200,6 +196,15 @@ function GestaoCardapio() {
                   className="gestao-categoria-select"
                 >
                   {categoriasOrdenadas.map(cat => {
+                    if (cat === 'Todos') {
+                      const total = produtos.length;
+                      const dispo = produtos.filter(p => p.disponivel).length;
+                      return (
+                        <option key={cat} value={cat}>
+                          Todos ({dispo}/{total})
+                        </option>
+                      );
+                    }
                     const total = produtos.filter(p => p.categoria === cat).length;
                     const dispo = produtos.filter(p => p.categoria === cat && p.disponivel).length;
                     return (
