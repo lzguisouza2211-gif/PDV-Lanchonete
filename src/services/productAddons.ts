@@ -21,7 +21,6 @@ export const productAddonsService = {
       .order('tipo', { ascending: true })
 
     if (error) {
-      console.error('Erro ao buscar addons:', error)
       return []
     }
 

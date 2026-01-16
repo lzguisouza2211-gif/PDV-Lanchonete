@@ -21,7 +21,6 @@ export default function App(): JSX.Element {
           audioRef.current?.pause()
           audioRef.current!.currentTime = 0
           unlockedRef.current = true
-          console.log('🔓 Áudio desbloqueado')
         })
         .catch(() => {})
 

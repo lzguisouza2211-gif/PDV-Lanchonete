@@ -15,7 +15,6 @@ export default function App() {
         { event: 'INSERT', schema: 'public', table: 'pedidos' },
         (payload) => {
           const pedido = payload.new as any
-          console.log('📡 Pedido novo (realtime)', pedido)
 
           addPedido(pedido)
 

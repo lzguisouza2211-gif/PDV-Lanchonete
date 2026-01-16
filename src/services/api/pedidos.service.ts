@@ -1,5 +1,4 @@
 import { supabase } from '../supabaseClient'
-import { logger } from '../logger/logger'
 
 export type Adicional = {
   nome: string
@@ -33,7 +32,6 @@ export const pedidosService = {
       .select('*')
 
     if (error) {
-      logger.error(error)
       throw error
     }
 
@@ -48,7 +46,6 @@ export const pedidosService = {
       .lt('created_at', end)
 
     if (error) {
-      logger.error(error)
       throw error
     }
 
@@ -61,7 +58,6 @@ export const pedidosService = {
       .insert([pedido])
 
     if (error) {
-      console.error('Erro Supabase:', error)
       return false
     }
 
@@ -75,7 +71,6 @@ export const pedidosService = {
       .eq('id', id)
 
     if (error) {
-      logger.error(error)
       return false
     }
 

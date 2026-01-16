@@ -100,7 +100,6 @@ export default function Financeiro() {
 
         setItensVendidos(itensArray)
       } catch (error) {
-        console.error('Erro ao carregar itens vendidos:', error)
       }
     }
 

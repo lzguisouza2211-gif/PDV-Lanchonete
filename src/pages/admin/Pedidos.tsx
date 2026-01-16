@@ -68,13 +68,11 @@ export default function PedidosAdmin() {
 
   useEffect(() => {
     if (!('Notification' in window)) {
-        console.warn('🔕 Navegador não suporta notificações')
         return
     }
 
     if (Notification.permission === 'default') {
         Notification.requestPermission().then((permission) => {
-        console.log('🔔 Permissão de notificação:', permission)
         })
     }
     }, [])

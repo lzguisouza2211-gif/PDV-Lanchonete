@@ -33,8 +33,6 @@ export function useCartWithPedidos() {
       cart.items
     )
 
-    console.log('📦 Pedido enviado:', pedido)
-
     try {
       // Adiciona timeout de 15s
       const criarPedidoPromise = criarPedidoService(pedido)

@@ -74,24 +74,14 @@ export default function usePedidos() {
       setLoading(true)
       setError(null)
 
-      console.log('📤 Tentando criar pedido:', pedido)
-
       const { data, error } = await supabase
         .from('pedidos')
         .insert([pedido])
         .select()
         .single()
 
-      console.log('🧪 Supabase response:', { data, error })
-
       if (error) {
         // ✅ Melhorar o log do erro
-        console.error('❌ Erro detalhado:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-        })
         
         // ✅ Mostrar erro mais específico
         const errorMessage = error.message || 'Erro desconhecido ao criar pedido'
@@ -101,13 +91,11 @@ export default function usePedidos() {
       }
 
       if (!data) {
-        console.error('⚠️ Nenhum dado retornado do Supabase')
         setError(new Error('Pedido criado mas nenhum dado retornado'))
         setLoading(false)
         return false
       }
 
-      console.log('✅ Pedido criado com sucesso:', data)
       setLoading(false)
       return true
     },
@@ -165,13 +153,6 @@ export default function usePedidos() {
           }
         }
 
-        console.log('📊 Fechando caixa:', {
-          data: dataFormatada,
-          periodo: dados.periodo,
-          total: dados.total,
-          userId,
-        })
-
         // Verificar se usuário está autenticado
         if (!userId) {
           const mensagemErro = 'Você precisa estar autenticado para fechar o caixa'
@@ -194,8 +175,6 @@ export default function usePedidos() {
           created_by: userId,
         }
 
-        console.log('📤 Payload do fechamento:', payload)
-
         const { data, error } = await supabase
           .from('fechamentos_caixa')
           .insert([payload])
@@ -203,12 +182,6 @@ export default function usePedidos() {
           .single()
 
         if (error) {
-          console.error('❌ Erro ao fechar caixa:', {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code,
-          })
 
           let mensagemErro = 'Erro ao registrar fechamento de caixa'
           if (error.code === 'PGRST116') {
@@ -233,14 +206,12 @@ export default function usePedidos() {
           return { sucesso: false, mensagem: 'Erro ao confirmar fechamento' }
         }
 
-        console.log('✅ Fechamento de caixa registrado:', data)
         setLoading(false)
         return {
           sucesso: true,
           mensagem: 'Fechamento de caixa registrado com sucesso!',
         }
       } catch (e: any) {
-        console.error('❌ Erro inesperado ao fechar caixa:', e)
         const mensagem = e.message || 'Erro inesperado ao fechar caixa'
         setError(new Error(mensagem))
         setLoading(false)
