@@ -134,8 +134,8 @@ export default function Admin() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: 20,
+            gridTemplateColumns: 'repeat(4, minmax(220px, 1fr))',
+            gap: 16,
           }}
           className="kanban-grid"
         >

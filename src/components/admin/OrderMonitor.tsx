@@ -42,9 +42,6 @@ export default function OrderMonitor({ pedidos }: OrderMonitorProps) {
     >
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
           marginBottom: 24,
         }}
       >
@@ -58,23 +55,6 @@ export default function OrderMonitor({ pedidos }: OrderMonitorProps) {
         >
           Monitor de Pedidos
         </h2>
-        <button
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#3b82f6',
-            fontSize: 14,
-            fontWeight: 500,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '4px 8px',
-          }}
-          onClick={() => window.location.href = '/admin'}
-        >
-          Ver banco de dados completo →
-        </button>
       </div>
 
       {pedidosOrdenados.length === 0 ? (

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { CartItem } from '../../store/useCart'
 
 type CartDrawerProps = {
@@ -73,6 +73,7 @@ export default function CartDrawer({
             justifyContent: 'space-between',
             alignItems: 'center',
             background: '#fff',
+            flexShrink: 0,
           }}
         >
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
@@ -240,6 +241,8 @@ export default function CartDrawer({
             padding: '16px 20px',
             borderTop: '1px solid #eee',
             background: '#fff',
+            overflowY: 'auto',
+            maxHeight: 'calc(100vh - 200px)',
           }}
         >
           <div

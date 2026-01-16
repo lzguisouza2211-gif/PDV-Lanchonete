@@ -90,7 +90,7 @@ export default function Cardapio(): JSX.Element {
   }, [categorias])
 
   useEffect(() => {
-    if (listaCategorias.length > 0 && !categoriaAtiva) {
+    if (listaCategorias.length > 0 && categoriaAtiva === null) {
       setCategoriaAtiva(listaCategorias[0])
     }
   }, [listaCategorias, categoriaAtiva])
@@ -357,14 +357,14 @@ export default function Cardapio(): JSX.Element {
           margin: '0 auto',
         }}
       >
-        {Object.entries(categorias).map(([categoria, lista]) => (
+        {listaCategorias.map((categoria) => (
           <div
             key={categoria}
             ref={(el) => (categoriaRefs.current[categoria] = el)}
           >
             <CategorySection
               categoria={categoria}
-              itens={Array.isArray(lista) ? lista : []}
+              itens={Array.isArray(categorias[categoria]) ? categorias[categoria] : []}
               onAddItem={handleAddItemClick}
               lojaAberta={lojaAberta}
               produtoAdicionado={produtoAdicionado}
