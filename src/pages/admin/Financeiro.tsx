@@ -46,7 +46,22 @@ export default function Financeiro() {
         const r = await listPedidosPorData(dia)
         results.push({
           data: dia.slice(8),
-          faturamento: r.faturamento,
+          faturamento: r.faturamento || 0,
+          totalPedidos: r.totalPedidos || 0,
+          pagamentos: {
+            pix: {
+              valor: r.pagamentos?.pix?.valor || 0,
+              quantidade: r.pagamentos?.pix?.quantidade || 0,
+            },
+            dinheiro: {
+              valor: r.pagamentos?.dinheiro?.valor || 0,
+              quantidade: r.pagamentos?.dinheiro?.quantidade || 0,
+            },
+            cartao: {
+              valor: r.pagamentos?.cartao?.valor || 0,
+              quantidade: r.pagamentos?.cartao?.quantidade || 0,
+            },
+          },
         })
       }
 
