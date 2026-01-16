@@ -1,0 +1,1006 @@
+import { useState, useEffect } from 'react'
+import { cardapioService, ItemCardapio } from '../../services/api/cardapio.service'
+
+interface MenuItem {
+  id: string
+  nome: string
+  categoria: string
+  preco: number
+  disponivel: boolean
+  ingredientes?: string[]
+}
+
+interface ProductCardProps {
+  item: MenuItem
+  updating: string | null
+  ingredientesIndisponiveis: Record<string, string[]>
+  priceDraft: Record<string, number>
+  onToggleAvailability: (id: string) => void
+  onSavePrice: (id: string) => void
+  onToggleIngrediente: (id: string, ingrediente: string) => void
+  onPriceChange: (id: string, value: number) => void
+}
+
+interface CompactProductCardProps {
+  item: MenuItem
+  updating: string | null
+  onToggleAvailability: (id: string) => void
+  onPriceChange: (id: string, value: number) => void
+}
+
+function getCategoryIcon(categoria: string) {
+  const icons: Record<string, string> = {
+    'Lanches': '🍔',
+    'Bebidas Quentes': '☕',
+    'Bebidas Frias': '🧊',
+    'Sobremesas': '🍰',
+    'Acompanhamentos': '🍟',
+  }
+  return icons[categoria] || '🍽️'
+}
+
+function CompactProductCard({
+  item,
+  updating,
+  onToggleAvailability,
+}: CompactProductCardProps) {
+  return (
+    <div
+      style={{
+        background: item.disponivel ? '#fff' : '#f8f9fa',
+        border: `2px solid ${item.disponivel ? '#e5e7eb' : '#d1d5db'}`,
+        borderRadius: '10px',
+        padding: '14px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        transition: 'all 0.2s ease',
+        opacity: item.disponivel ? 1 : 0.7,
+      }}
+      onMouseEnter={(e) => {
+        if (item.disponivel) {
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = 'none'
+      }}
+    >
+      {/* Icon */}
+      <div style={{
+        width: '40px',
+        height: '40px',
+        borderRadius: '8px',
+        background: '#f3f4f6',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '22px',
+        flexShrink: 0,
+      }}>
+        {getCategoryIcon(item.categoria)}
+      </div>
+      
+      {/* Info */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h4 style={{
+          fontWeight: 700,
+          fontSize: '14px',
+          color: '#1a1a1a',
+          margin: '0 0 2px 0',
+          wordWrap: 'break-word',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>
+          {item.nome}
+        </h4>
+        <p style={{
+          margin: 0,
+          fontSize: '13px',
+          color: '#16a34a',
+          fontWeight: 700,
+        }}>
+          R$ {item.preco.toFixed(2)}
+        </p>
+      </div>
+
+      {/* Status Badge & Toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        <div style={{
+          padding: '4px 10px',
+          borderRadius: '6px',
+          background: item.disponivel ? '#dcfce7' : '#fee2e2',
+          color: item.disponivel ? '#166534' : '#991b1b',
+          fontSize: '10px',
+          fontWeight: 700,
+          whiteSpace: 'nowrap',
+        }}>
+          {item.disponivel ? '● Online' : '● Offline'}
+        </div>
+        
+        <button
+          onClick={() => onToggleAvailability(item.id)}
+          disabled={updating === item.id}
+          style={{
+            padding: '8px 12px',
+            borderRadius: '6px',
+            border: 'none',
+            background: item.disponivel ? '#fee2e2' : '#dcfce7',
+            color: item.disponivel ? '#991b1b' : '#166534',
+            fontSize: '11px',
+            fontWeight: 700,
+            cursor: updating === item.id ? 'wait' : 'pointer',
+            transition: 'all 0.2s ease',
+            opacity: updating === item.id ? 0.7 : 1,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {updating === item.id ? '⏳' : (item.disponivel ? '✗' : '✓')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ProductCard({
+  item,
+  updating,
+  ingredientesIndisponiveis,
+  priceDraft,
+  onToggleAvailability,
+  onSavePrice,
+  onToggleIngrediente,
+  onPriceChange,
+}: ProductCardProps) {
+  const priceChanged = priceDraft[item.id] !== item.preco
+
+  return (
+    <div
+      style={{
+        background: item.disponivel ? '#fff' : '#f8f9fa',
+        border: `2px solid ${item.disponivel ? '#e5e7eb' : '#d1d5db'}`,
+        borderRadius: '12px',
+        padding: '20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+        transition: 'all 0.2s ease',
+        opacity: item.disponivel ? 1 : 0.7,
+      }}
+      onMouseEnter={(e) => {
+        if (item.disponivel) {
+          e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.12)'
+          e.currentTarget.style.transform = 'translateY(-2px)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = 'none'
+        e.currentTarget.style.transform = 'translateY(0)'
+      }}
+    >
+      {/* Product Header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '12px',
+      }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '10px',
+          background: '#f3f4f6',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '28px',
+          flexShrink: 0,
+        }}>
+          {getCategoryIcon(item.categoria)}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h3 style={{
+            fontWeight: 700,
+            fontSize: '16px',
+            color: '#1a1a1a',
+            margin: '0 0 2px 0',
+            wordWrap: 'break-word',
+          }}>
+            {item.nome}
+          </h3>
+          <p style={{
+            margin: 0,
+            fontSize: '12px',
+            color: '#9ca3af',
+            fontWeight: 500,
+          }}>
+            {item.categoria}
+          </p>
+        </div>
+        {/* Status Badge */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '6px 12px',
+          borderRadius: '8px',
+          background: item.disponivel ? '#dcfce7' : '#fee2e2',
+          color: item.disponivel ? '#166534' : '#991b1b',
+          fontSize: '11px',
+          fontWeight: 700,
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+        }}>
+          {item.disponivel ? '●' : '●'} {item.disponivel ? 'Online' : 'Offline'}
+        </div>
+      </div>
+
+      {/* Divisor */}
+      <div style={{ height: '1px', background: '#e5e7eb' }} />
+
+      {/* Price Section */}
+      <div>
+        <label style={{
+          display: 'block',
+          fontSize: '12px',
+          fontWeight: 600,
+          color: '#374151',
+          marginBottom: '8px',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+        }}>
+          💰 Preço
+        </label>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 12px',
+            borderRadius: '8px',
+            border: `1px solid ${priceChanged ? '#f59e0b' : '#e5e7eb'}`,
+            background: priceChanged ? '#fffbeb' : '#fff',
+          }}>
+            <span style={{ color: '#6b7280', fontSize: '14px', fontWeight: 600 }}>R$</span>
+            <input
+              type="number"
+              step="0.01"
+              value={priceDraft[item.id] ?? item.preco}
+              onChange={(e) => onPriceChange(item.id, Number(e.target.value))}
+              style={{
+                flex: 1,
+                border: 'none',
+                background: 'transparent',
+                fontSize: '16px',
+                fontWeight: 700,
+                color: '#1a1a1a',
+                outline: 'none',
+                padding: 0,
+              }}
+            />
+          </div>
+          <button
+            onClick={() => onSavePrice(item.id)}
+            disabled={updating === item.id || !priceChanged}
+            style={{
+              padding: '10px 14px',
+              borderRadius: '8px',
+              border: 'none',
+              background: priceChanged ? '#c0392b' : '#e5e7eb',
+              color: priceChanged ? '#fff' : '#9ca3af',
+              fontWeight: 600,
+              fontSize: '12px',
+              cursor: updating === item.id || !priceChanged ? 'not-allowed' : 'pointer',
+              opacity: updating === item.id ? 0.7 : 1,
+              transition: 'all 0.2s ease',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            {updating === item.id ? '⏳' : '✓'}
+          </button>
+        </div>
+        {priceChanged && (
+          <p style={{
+            margin: '4px 0 0 0',
+            fontSize: '11px',
+            color: '#f59e0b',
+            fontWeight: 500,
+          }}>
+            ⚠️ Preço alterado
+          </p>
+        )}
+      </div>
+
+      {/* Ingredients Section */}
+      {item.ingredientes && item.ingredientes.length > 0 && (
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '12px',
+            fontWeight: 600,
+            color: '#374151',
+            marginBottom: '8px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+          }}>
+            🥘 Ingredientes
+          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {item.ingredientes.map((ing) => {
+              const indispo = (ingredientesIndisponiveis[item.id] || []).includes(ing)
+              return (
+                <button
+                  key={ing}
+                  onClick={() => onToggleIngrediente(item.id, ing)}
+                  disabled={updating === item.id}
+                  style={{
+                    border: `1.5px solid ${indispo ? '#ef4444' : '#d1d5db'}`,
+                    background: indispo ? '#fee2e2' : '#f9fafb',
+                    color: indispo ? '#991b1b' : '#374151',
+                    padding: '6px 12px',
+                    borderRadius: '16px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: updating === item.id ? 'wait' : 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (updating !== item.id) {
+                      e.currentTarget.style.transform = 'scale(1.05)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)'
+                  }}
+                >
+                  {indispo ? '❌' : '✓'} {ing}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Divisor */}
+      <div style={{ height: '1px', background: '#e5e7eb' }} />
+
+      {/* Toggle Button */}
+      <button
+        onClick={() => onToggleAvailability(item.id)}
+        disabled={updating === item.id}
+        style={{
+          width: '100%',
+          padding: '12px 16px',
+          borderRadius: '8px',
+          border: 'none',
+          fontWeight: 700,
+          fontSize: '14px',
+          cursor: updating === item.id ? 'wait' : 'pointer',
+          transition: 'all 0.2s ease',
+          opacity: updating === item.id ? 0.7 : 1,
+          background: item.disponivel ? '#fee2e2' : '#dcfce7',
+          color: item.disponivel ? '#991b1b' : '#166534',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+        }}
+        onMouseEnter={(e) => {
+          if (updating !== item.id) {
+            e.currentTarget.style.transform = 'translateY(-1px)'
+            e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}
+      >
+        {updating === item.id ? '⏳ Processando...' : (item.disponivel ? '🔴 Desabilitar (Ocultar)' : '🟢 Habilitar (Mostrar)')}
+      </button>
+    </div>
+  )
+}
+
+export default function GestaoCardapio() {
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [updating, setUpdating] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [priceDraft, setPriceDraft] = useState<Record<string, number>>({})
+  const [ingredientesIndisponiveis, setIngredientesIndisponiveis] = useState<Record<string, string[]>>({})
+  const [statusFilter, setStatusFilter] = useState<'all' | 'disponivel' | 'indisponivel'>('all')
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  const [viewMode, setViewMode] = useState<'compact' | 'detailed'>('compact')
+
+  const carregarTodos = async () => {
+    try {
+      setLoading(true)
+      const itens = await cardapioService.listAll()
+      const indisponiveis = await cardapioService.listarIngredientesIndisponiveisHoje()
+      
+      const items = itens.map(item => ({
+        id: item.id,
+        nome: item.nome,
+        categoria: item.categoria,
+        preco: item.preco,
+        disponivel: item.disponivel ?? true,
+        ingredientes: item.ingredientes ?? [],
+      }))
+      
+      setMenuItems(items)
+      setIngredientesIndisponiveis(indisponiveis)
+      const drafts: Record<string, number> = {}
+      items.forEach(i => { drafts[i.id] = i.preco })
+      setPriceDraft(drafts)
+    } catch (error) {
+      console.error('Erro ao carregar cardápio:', error)
+      alert('Erro ao carregar cardápio')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    carregarTodos()
+  }, [])
+
+  const handleToggleAvailability = async (id: string) => {
+    try {
+      setUpdating(id)
+      // Atualização otimista - muda logo na UI
+      setMenuItems(prev => 
+        prev.map(item => 
+          item.id === id ? { ...item, disponivel: !item.disponivel } : item
+        )
+      )
+      // Depois sincroniza com banco
+      await cardapioService.toggleDisponibilidade(id)
+    } catch (error: any) {
+      console.error('Erro ao atualizar disponibilidade:', error)
+      // Recarrega se falhar
+      await carregarTodos()
+      alert(`Erro ao atualizar disponibilidade do produto:\n${error?.message}`)
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  const handleSavePrice = async (id: string) => {
+    try {
+      setUpdating(id)
+      const novoPreco = priceDraft[id]
+      // Atualização otimista
+      setMenuItems(prev =>
+        prev.map(item =>
+          item.id === id ? { ...item, preco: novoPreco } : item
+        )
+      )
+      // Sincroniza com banco
+      await cardapioService.atualizarPreco(id, novoPreco)
+    } catch (error: any) {
+      console.error('Erro ao atualizar preço:', error)
+      await carregarTodos()
+      alert(`Erro ao atualizar preço:\n${error?.message}`)
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  const handleToggleIngrediente = async (id: string, ingrediente: string) => {
+    try {
+      setUpdating(id)
+      const lista = ingredientesIndisponiveis[id] || []
+      const jaIndisponivel = lista.includes(ingrediente)
+      
+      // Atualização otimista
+      setIngredientesIndisponiveis(prev => ({
+        ...prev,
+        [id]: jaIndisponivel
+          ? prev[id].filter(ing => ing !== ingrediente)
+          : [...(prev[id] || []), ingrediente]
+      }))
+      
+      // Sincroniza com banco
+      await cardapioService.definirIngredienteIndisponivel(id, ingrediente, !jaIndisponivel)
+    } catch (error: any) {
+      console.error('Erro ao atualizar ingrediente:', error)
+      await carregarTodos()
+      alert(`Erro ao atualizar ingrediente:\n${error?.message}`)
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  const onPriceChange = (id: string, value: number) => {
+    setPriceDraft(prev => ({
+      ...prev,
+      [id]: value
+    }))
+  }
+
+  const categories = ['all', ...new Set(menuItems.map(item => item.categoria))]
+  
+  let filteredItems = selectedCategory === 'all'
+    ? menuItems
+    : menuItems.filter(item => item.categoria === selectedCategory)
+  
+  // Filtro por status
+  if (statusFilter !== 'all') {
+    filteredItems = filteredItems.filter(item => 
+      statusFilter === 'disponivel' ? item.disponivel : !item.disponivel
+    )
+  }
+  
+  // Filtro por busca
+  if (searchTerm) {
+    filteredItems = filteredItems.filter(item =>
+      item.nome.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }
+
+  const disponiveisCount = menuItems.filter(i => i.disponivel).length
+  const indisponivelCount = menuItems.filter(i => !i.disponivel).length
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(category)) {
+        newSet.delete(category)
+      } else {
+        newSet.add(category)
+      }
+      return newSet
+    })
+  }
+
+  const expandAllCategories = () => {
+    const allCats = categories.filter(c => c !== 'all')
+    setExpandedCategories(new Set(allCats))
+  }
+
+  const collapseAllCategories = () => {
+    setExpandedCategories(new Set())
+  }
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', background: '#f8f9fa', minHeight: '100vh' }}>
+      {/* Header */}
+      <div style={{ marginBottom: '32px', background: '#fff', padding: '24px 28px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 4px 0', color: '#1a1a1a' }}>
+          📋 Gestão de Cardápio
+        </h1>
+        <p style={{ margin: 0, color: '#6b7280', fontSize: 14 }}>
+          Configure disponibilidade, preços e ingredientes indisponíveis
+        </p>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '80px 20px', color: '#999' }}>
+          <p style={{ fontSize: 18, margin: 0 }}>⏳ Carregando cardápio...</p>
+        </div>
+      ) : (
+        <>
+          {/* Controles e Filtros */}
+          <div style={{
+            background: '#fff',
+            padding: '20px 24px',
+            borderRadius: '12px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            marginBottom: '24px',
+          }}>
+            {/* Search Bar */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#374151',
+                marginBottom: '8px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+              }}>
+                🔍 Buscar Produto
+              </label>
+              <input
+                type="text"
+                placeholder="Digite o nome do produto..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  fontSize: '14px',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '8px',
+                  outline: 'none',
+                  transition: 'all 0.2s ease',
+                  fontFamily: 'inherit',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#c0392b'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(192, 57, 43, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+              {/* Filtro de Status */}
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}>
+                  📊 Status
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => setStatusFilter('all')}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      border: `2px solid ${statusFilter === 'all' ? '#c0392b' : '#e5e7eb'}`,
+                      background: statusFilter === 'all' ? '#c0392b' : '#fff',
+                      color: statusFilter === 'all' ? '#fff' : '#6b7280',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    Todos
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('disponivel')}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      border: `2px solid ${statusFilter === 'disponivel' ? '#10b981' : '#e5e7eb'}`,
+                      background: statusFilter === 'disponivel' ? '#10b981' : '#fff',
+                      color: statusFilter === 'disponivel' ? '#fff' : '#6b7280',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    ✓ Online
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('indisponivel')}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      border: `2px solid ${statusFilter === 'indisponivel' ? '#ef4444' : '#e5e7eb'}`,
+                      background: statusFilter === 'indisponivel' ? '#ef4444' : '#fff',
+                      color: statusFilter === 'indisponivel' ? '#fff' : '#6b7280',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    ✗ Offline
+                  </button>
+                </div>
+              </div>
+
+              {/* Modo de Visualização */}
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}>
+                  👁️ Visualização
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => setViewMode('compact')}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      border: `2px solid ${viewMode === 'compact' ? '#3b82f6' : '#e5e7eb'}`,
+                      background: viewMode === 'compact' ? '#3b82f6' : '#fff',
+                      color: viewMode === 'compact' ? '#fff' : '#6b7280',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    ▤ Compacto
+                  </button>
+                  <button
+                    onClick={() => setViewMode('detailed')}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      border: `2px solid ${viewMode === 'detailed' ? '#3b82f6' : '#e5e7eb'}`,
+                      background: viewMode === 'detailed' ? '#3b82f6' : '#fff',
+                      color: viewMode === 'detailed' ? '#fff' : '#6b7280',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    ▦ Detalhado
+                  </button>
+                </div>
+              </div>
+
+              {/* Controles de Categoria */}
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}>
+                  📂 Categorias
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={expandAllCategories}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      border: '2px solid #e5e7eb',
+                      background: '#fff',
+                      color: '#6b7280',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    ⬇ Expandir
+                  </button>
+                  <button
+                    onClick={collapseAllCategories}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      border: '2px solid #e5e7eb',
+                      background: '#fff',
+                      color: '#6b7280',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    ⬆ Recolher
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '16px',
+            marginBottom: '24px',
+          }}>
+            {/* Stats Box - Disponíveis */}
+            <div style={{
+              background: '#fff',
+              padding: '16px 20px',
+              borderRadius: '12px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              borderLeft: '4px solid #10b981',
+            }}>
+              <div style={{ fontSize: 32 }}>✓</div>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: '#10b981' }}>
+                  {disponiveisCount}
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+                  Disponíveis
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Box - Indisponíveis */}
+            <div style={{
+              background: '#fff',
+              padding: '16px 20px',
+              borderRadius: '12px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              borderLeft: '4px solid #ef4444',
+            }}>
+              <div style={{ fontSize: 32 }}>✗</div>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: '#ef4444' }}>
+                  {indisponivelCount}
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+                  Indisponíveis
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Box - Total */}
+            <div style={{
+              background: '#fff',
+              padding: '16px 20px',
+              borderRadius: '12px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              borderLeft: '4px solid #3b82f6',
+            }}>
+              <div style={{ fontSize: 32 }}>📊</div>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: '#3b82f6' }}>
+                  {menuItems.length}
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+                  Total
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Filter Tabs - Removido para simplificar */}
+
+          {/* Items Grid */}
+          {filteredItems.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '60px 20px',
+              color: '#9ca3af',
+              background: '#fff',
+              borderRadius: '12px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            }}>
+              <p style={{ fontSize: 18, margin: 0, fontWeight: 500 }}>
+                {searchTerm ? '❌ Nenhum produto encontrado' : '📭 Nenhum produto com os filtros selecionados'}
+              </p>
+            </div>
+          ) : (
+            <div>
+              {/* Group by Category with Collapsible Sections */}
+              {categories.filter(cat => cat !== 'all' && (selectedCategory === 'all' || selectedCategory === cat)).map(category => {
+                const itemsInCategory = filteredItems.filter(item => item.categoria === category)
+                if (itemsInCategory.length === 0) return null
+                
+                const isExpanded = expandedCategories.has(category)
+                
+                return (
+                  <div key={category} style={{ marginBottom: '16px' }}>
+                    {/* Category Header - Collapsible */}
+                    <button
+                      onClick={() => toggleCategory(category)}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '16px 20px',
+                        background: '#fff',
+                        border: 'none',
+                        borderRadius: '12px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        marginBottom: isExpanded ? '12px' : '0',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.12)'
+                        e.currentTarget.style.transform = 'translateY(-1px)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)'
+                        e.currentTarget.style.transform = 'translateY(0)'
+                      }}
+                    >
+                      <div style={{
+                        fontSize: '24px',
+                        transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease',
+                      }}>
+                        ▶
+                      </div>
+                      <div style={{ fontSize: '28px' }}>{getCategoryIcon(category)}</div>
+                      <h2 style={{
+                        fontSize: '18px',
+                        fontWeight: 700,
+                        color: '#1a1a1a',
+                        margin: 0,
+                        flex: 1,
+                        textAlign: 'left',
+                      }}>
+                        {category}
+                      </h2>
+                      <div style={{
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        color: '#fff',
+                        background: '#c0392b',
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                      }}>
+                        {itemsInCategory.length} item{itemsInCategory.length !== 1 ? 's' : ''}
+                      </div>
+                    </button>
+
+                    {/* Items Grid for this category - Only show if expanded */}
+                    {isExpanded && (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: viewMode === 'compact' 
+                          ? 'repeat(auto-fill, minmax(280px, 1fr))' 
+                          : 'repeat(auto-fill, minmax(340px, 1fr))',
+                        gap: '16px',
+                        padding: '0 4px',
+                      }}>
+                        {itemsInCategory.map((item) => (
+                          viewMode === 'compact' ? (
+                            <CompactProductCard 
+                              key={item.id}
+                              item={item}
+                              updating={updating}
+                              onToggleAvailability={handleToggleAvailability}
+                              onPriceChange={onPriceChange}
+                            />
+                          ) : (
+                            <ProductCard 
+                              key={item.id}
+                              item={item}
+                              updating={updating}
+                              ingredientesIndisponiveis={ingredientesIndisponiveis}
+                              priceDraft={priceDraft}
+                              onToggleAvailability={handleToggleAvailability}
+                              onSavePrice={handleSavePrice}
+                              onToggleIngrediente={handleToggleIngrediente}
+                              onPriceChange={onPriceChange}
+                            />
+                          )
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}

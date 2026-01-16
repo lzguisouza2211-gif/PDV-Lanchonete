@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 
 export type ExtraOption = {
   id: string
@@ -10,6 +10,7 @@ export type ExtraOption = {
 export type CustomizationData = {
   extras: ExtraOption[]
   observacoes: string
+  ingredientes_indisponiveis?: string[]
 }
 
 type ProductCustomizationModalProps = {
@@ -23,6 +24,7 @@ type ProductCustomizationModalProps = {
   }
   extrasDisponiveis?: ExtraOption[]
   ingredientesRemoviveis?: string[]
+  ingredientesIndisponiveis?: string[]
   onConfirm: (data: CustomizationData) => void
 }
 
@@ -32,13 +34,17 @@ export default function ProductCustomizationModal({
   produto,
   extrasDisponiveis = [],
   ingredientesRemoviveis = [],
+  ingredientesIndisponiveis = [],
   onConfirm,
 }: ProductCustomizationModalProps) {
+  if (!isOpen) return null
+
   const [extrasSelecionados, setExtrasSelecionados] = useState<string[]>([])
   const [ingredientesRemovidos, setIngredientesRemovidos] = useState<string[]>([])
   const [observacoes, setObservacoes] = useState('')
   const [adicionarExpandido, setAdicionarExpandido] = useState(false)
   const [retirarExpandido, setRetirarExpandido] = useState(false)
+  const [substituicoes, setSubstituicoes] = useState<Record<string, string>>({})
 
   // Resetar estados quando o modal fechar
   useEffect(() => {
@@ -48,15 +54,60 @@ export default function ProductCustomizationModal({
       setObservacoes('')
       setAdicionarExpandido(false)
       setRetirarExpandido(false)
+      setSubstituicoes({})
     }
   }, [isOpen])
 
-  if (!isOpen) return null
+  const { indisponiveisHoje, indisponiveisKey } = useMemo(() => {
+    if (!Array.isArray(ingredientesIndisponiveis)) {
+      return { indisponiveisHoje: [] as string[], indisponiveisKey: '' }
+    }
+
+    const list = ingredientesIndisponiveis
+      .filter(Boolean)
+      .map((i) => i.trim())
+
+    return {
+      indisponiveisHoje: list,
+      indisponiveisKey: list.join('|'),
+    }
+  }, [ingredientesIndisponiveis])
+
+  const indisponiveisSet = useMemo(
+    () => new Set(indisponiveisHoje.map((i) => i.toLowerCase())),
+    [indisponiveisHoje]
+  )
 
   const extrasAdicionais = extrasDisponiveis.filter((e) => e.tipo === 'add')
+  // Mapeia extras com flag de substituição para ingredientes indisponíveis
+  const extrasComSubstituicao = extrasAdicionais.map((extra) => ({
+    ...extra,
+    isSubstituicao: indisponiveisSet.has(extra.nome.toLowerCase()),
+  }))
   
   // Garantir que ingredientesRemoviveis seja array
   const ingredientesLista = Array.isArray(ingredientesRemoviveis) ? ingredientesRemoviveis : []
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    setIngredientesRemovidos((prev) => {
+      const merged = new Set(prev)
+      indisponiveisHoje.forEach((ing) => merged.add(ing))
+      return Array.from(merged)
+    })
+
+    setSubstituicoes(
+      indisponiveisHoje.reduce((acc, ing) => {
+        acc[ing] = ''
+        return acc
+      }, {} as Record<string, string>)
+    )
+
+    if (indisponiveisHoje.length > 0) {
+      setRetirarExpandido(true)
+    }
+  }, [isOpen, indisponiveisKey])
 
   const toggleExtra = (id: string) => {
     setExtrasSelecionados((prev) =>
@@ -74,19 +125,68 @@ export default function ProductCustomizationModal({
 
   const calcularPrecoTotal = () => {
     const precoBase = produto.preco
-    const precoExtras = extrasSelecionados.reduce((total, id) => {
-      const extra = extrasDisponiveis.find((e) => e.id === id)
-      return total + (extra?.preco || 0)
+
+    // Número de ingredientes grátis = número de ingredientes faltando
+    const qtdGratis = indisponiveisHoje.length
+
+    // Extras selecionados (sem substituições - aquelas já são de substituição)
+    const extras = extrasSelecionados.map((id) =>
+      extrasDisponiveis.find((e) => e.id === id)
+    ).filter((e): e is ExtraOption => !!e)
+
+    // Ordena extras por preço descendente (mais caros primeiro ficam grátis)
+    const extrasOrdenados = [...extras].sort((a, b) => b.preco - a.preco)
+
+    // Primeiros N extras são grátis (onde N = qtd de indisponíveis)
+    const precoExtras = extrasOrdenados.reduce((total, extra, index) => {
+      const ehGratis = index < qtdGratis
+      return total + (ehGratis ? 0 : extra.preco)
     }, 0)
+
     return precoBase + precoExtras
   }
 
+  // Determina quais extras são grátis
+  const extrasGratisMap = useMemo(() => {
+    const qtdGratis = indisponiveisHoje.length
+    const extras = extrasSelecionados.map((id) =>
+      extrasDisponiveis.find((e) => e.id === id)
+    ).filter((e): e is ExtraOption => !!e)
+
+    const extrasOrdenados = [...extras].sort((a, b) => b.preco - a.preco)
+    const gratis = new Set(extrasOrdenados.slice(0, qtdGratis).map((e) => e.id))
+    return gratis
+  }, [extrasSelecionados, indisponiveisHoje, extrasDisponiveis])
+
   const handleConfirm = () => {
-    const extras: ExtraOption[] = [
-      ...extrasSelecionados
-        .map((id) => extrasDisponiveis.find((e) => e.id === id))
-        .filter((e): e is ExtraOption => !!e),
-      ...ingredientesRemovidos.map((nome) => ({
+    const removidosSet = new Set<string>([
+      ...ingredientesRemovidos,
+      ...indisponiveisHoje,
+    ])
+
+    const extrasSelecionadosObjs = extrasSelecionados
+      .map((id) => extrasDisponiveis.find((e) => e.id === id))
+      .filter((e): e is ExtraOption => !!e)
+
+    const substituicoesExtras = Object.values(substituicoes)
+      .filter((id) => !!id)
+      .map((id) => extrasDisponiveis.find((e) => e.id === id))
+      .filter((e): e is ExtraOption => !!e)
+
+    const extrasMap = new Map<string, ExtraOption>()
+    ;[...extrasSelecionadosObjs, ...substituicoesExtras].forEach((extra) => {
+      extrasMap.set(extra.id, extra)
+    })
+
+    // Determina quais extras são grátis (por substituição)
+    const qtdGratis = indisponiveisHoje.length
+    const extras = Array.from(extrasMap.values())
+    const extrasOrdenados = [...extras].sort((a, b) => b.preco - a.preco)
+    const gratisSet = new Set(extrasOrdenados.slice(0, qtdGratis).map((e) => e.id))
+
+    const extras_final: ExtraOption[] = [
+      ...extrasMap.values(),
+      ...Array.from(removidosSet).map((nome) => ({
         id: `remove-${nome}`,
         nome,
         preco: 0,
@@ -94,9 +194,16 @@ export default function ProductCustomizationModal({
       })),
     ]
 
+    // Marca os extras que são grátis por substituição
+    const extrasComMarcacao = extras_final.map((e) => ({
+      ...e,
+      _isFreeSubstituicao: gratisSet.has(e.id),
+    }))
+
     onConfirm({
-      extras,
+      extras: extrasComMarcacao as ExtraOption[],
       observacoes: observacoes.trim(),
+      ingredientes_indisponiveis: indisponiveisHoje,
     })
     
     // Reset
@@ -193,8 +300,27 @@ export default function ProductCustomizationModal({
           </div>
         </div>
 
+        {indisponiveisHoje.length > 0 && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: 12,
+              borderRadius: 10,
+              background: '#fff7ed',
+              border: '1px dashed #f39c12',
+            }}
+          >
+            <div style={{ fontWeight: 700, color: '#b35c00', fontSize: 14, marginBottom: 4 }}>
+              ⚠️ Hoje estamos sem: {indisponiveisHoje.join(', ')}
+            </div>
+            <div style={{ fontSize: 13, color: '#6b3b00', lineHeight: 1.4 }}>
+              Você pode escolher outro ingrediente no lugar do que falta, sem custo adicional.
+            </div>
+          </div>
+        )}
+
         {/* Seção Adicionar - Expansível */}
-        {extrasAdicionais.length > 0 && (
+        {extrasComSubstituicao.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <button
               onClick={() => setAdicionarExpandido(!adicionarExpandido)}
@@ -260,7 +386,7 @@ export default function ProductCustomizationModal({
 
             {adicionarExpandido && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
-                {extrasAdicionais.map((extra) => {
+                {extrasComSubstituicao.map((extra) => {
                   const isSelected = extrasSelecionados.includes(extra.id)
                   return (
                     <label
@@ -302,8 +428,19 @@ export default function ProductCustomizationModal({
                           {extra.nome}
                         </span>
                       </div>
-                      <span style={{ fontSize: 15, fontWeight: 600, color: '#27ae60' }}>
-                        + R$ {extra.preco.toFixed(2)}
+                      <span
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 600,
+                          color:
+                            extrasGratisMap.has(extra.id) && isSelected
+                              ? '#f39c12'
+                              : '#27ae60',
+                        }}
+                      >
+                        {extrasGratisMap.has(extra.id) && isSelected
+                          ? 'Grátis'
+                          : `+ R$ ${extra.preco.toFixed(2)}`}
                       </span>
                     </label>
                   )
@@ -382,6 +519,7 @@ export default function ProductCustomizationModal({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 150, overflowY: 'auto', paddingRight: 4 }}>
                 {ingredientesLista.map((ingrediente) => {
                   const isRemoved = ingredientesRemovidos.includes(ingrediente)
+                  const isIndisponivelHoje = indisponiveisSet.has(ingrediente.toLowerCase())
                   return (
                     <label
                       key={ingrediente}
@@ -390,20 +528,20 @@ export default function ProductCustomizationModal({
                         alignItems: 'center',
                         gap: 10,
                         padding: 10,
-                        border: `2px solid ${isRemoved ? '#e74c3c' : '#e0e0e0'}`,
+                        border: `2px solid ${isRemoved || isIndisponivelHoje ? '#e74c3c' : '#e0e0e0'}`,
                         borderRadius: 8,
                         cursor: 'pointer',
-                        background: isRemoved ? '#fee' : '#fff',
+                        background: isRemoved || isIndisponivelHoje ? '#fee' : '#fff',
                         transition: 'all 0.2s ease',
                       }}
                       onMouseEnter={(e) => {
-                        if (!isRemoved) {
+                        if (!isRemoved && !isIndisponivelHoje) {
                           e.currentTarget.style.borderColor = '#e74c3c'
                           e.currentTarget.style.background = '#fff5f5'
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (!isRemoved) {
+                        if (!isRemoved && !isIndisponivelHoje) {
                           e.currentTarget.style.borderColor = '#e0e0e0'
                           e.currentTarget.style.background = '#fff'
                         }
@@ -411,8 +549,9 @@ export default function ProductCustomizationModal({
                     >
                       <input
                         type="checkbox"
-                        checked={isRemoved}
-                        onChange={() => toggleIngrediente(ingrediente)}
+                        checked={isRemoved || isIndisponivelHoje}
+                        onChange={() => !isIndisponivelHoje && toggleIngrediente(ingrediente)}
+                        disabled={isIndisponivelHoje}
                         style={{
                           width: 18,
                           height: 18,
@@ -421,10 +560,10 @@ export default function ProductCustomizationModal({
                           flexShrink: 0,
                         }}
                       />
-                      <span style={{ fontSize: 14, fontWeight: 500, flex: 1, color: isRemoved ? '#991b1b' : '#1a1a1a' }}>
-                        Sem {ingrediente}
+                      <span style={{ fontSize: 14, fontWeight: 500, flex: 1, color: isRemoved || isIndisponivelHoje ? '#991b1b' : '#1a1a1a' }}>
+                        Sem {ingrediente} {isIndisponivelHoje ? '(faltando hoje)' : ''}
                       </span>
-                      {isRemoved && (
+                      {(isRemoved || isIndisponivelHoje) && (
                         <span style={{ fontSize: 16, color: '#e74c3c', fontWeight: 700 }}>
                           ✕
                         </span>

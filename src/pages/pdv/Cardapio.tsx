@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useCardapio } from '../../hooks/useCardapio'
 import { useCartWithPedidos } from '../../store/useCartWithPedidos'
 import { useStoreStatus } from '../../hooks/useStoreStatus'
@@ -11,9 +11,15 @@ import ProductCustomizationModal, {
 } from '../../components/pdv/ProductCustomizationModal'
 import CustomizationPrompt from '../../components/pdv/CustomizationPrompt'
 import { productAddonsService } from '../../services/productAddons'
+import { cardapioService } from '../../services/api/cardapio.service'
+import PixKeyDisplay from '../../components/pdv/PixKeyDisplay'
+import { PIX_CONFIG } from '../../config/pix'
+import { useIngredientesIndisponiveisRealtime } from '../../hooks/useIngredientesIndisponiveisRealtime'
+import { useProdutosDisponibilidadeRealtime } from '../../hooks/useProdutosDisponibilidadeRealtime'
 
 export default function Cardapio(): JSX.Element {
-  const { itens, loading, error } = useCardapio()
+  const { itens: itensCardapio, loading, error, recarregar } = useCardapio()
+  const [itens, setItens] = useState<any[]>([])
   const { items, add, remove, criarPedido } = useCartWithPedidos()
   const { isOpen: lojaAberta, loading: statusLoading } = useStoreStatus()
 
@@ -38,6 +44,7 @@ export default function Cardapio(): JSX.Element {
   const [produtoSelecionado, setProdutoSelecionado] = useState<any>(null)
   const [extrasDisponiveis, setExtrasDisponiveis] = useState<ExtraOption[]>([])
   const [produtoAdicionado, setProdutoAdicionado] = useState<string | null>(null)
+  const [ingredientesIndisponiveisHoje, setIngredientesIndisponiveisHoje] = useState<Record<string, string[]>>({})
 
   const enviandoRef = useRef(false)
   const categoriaRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -50,12 +57,18 @@ export default function Cardapio(): JSX.Element {
     return s + (i.price + extras) * i.qty
   }, 0)
 
+  // Sincroniza itens do hook com estado local para permitir atualizações em tempo real
+  useEffect(() => {
+    setItens(itensCardapio)
+  }, [itensCardapio])
+
   const ORDEM_CATEGORIAS = [
     'Lanches',
     'Macarrão',
     'Porções',
     'Omeletes',
     'Bebidas',
+    'Cervejas',
     'Doces',
   ]
 
@@ -77,10 +90,39 @@ export default function Cardapio(): JSX.Element {
   }, [categorias])
 
   useEffect(() => {
-    if (listaCategorias.length > 0 && !categoriaAtiva) {
+    if (listaCategorias.length > 0 && categoriaAtiva === null) {
       setCategoriaAtiva(listaCategorias[0])
     }
   }, [listaCategorias, categoriaAtiva])
+
+  useEffect(() => {
+    const carregarIndisponiveis = async () => {
+      try {
+        const mapa = await cardapioService.listarIngredientesIndisponiveisHoje()
+        setIngredientesIndisponiveisHoje(mapa)
+      } catch (err) {
+        console.error('Erro ao carregar ingredientes indisponíveis para hoje:', err)
+      }
+    }
+
+    carregarIndisponiveis()
+  }, [])
+
+  // Callbacks memoizadas para evitar re-execução infinita dos hooks realtime
+  const handleIngredientesIndisponiveisUpdate = useCallback((mapa: Record<string, string[]>) => {
+    setIngredientesIndisponiveisHoje(mapa)
+  }, [])
+
+  const handleProdutosDisponibilidadeUpdate = useCallback((itensAtualizados: any[]) => {
+    setItens(itensAtualizados)
+    console.log('📡 Cardápio atualizado em tempo real:', itensAtualizados.length, 'itens')
+  }, [])
+
+  // Realtime/Polling para indisponibilidade de ingredientes
+  useIngredientesIndisponiveisRealtime(handleIngredientesIndisponiveisUpdate)
+
+  // Realtime/Polling para disponibilidade de produtos (habilitar/desabilitar)
+  useProdutosDisponibilidadeRealtime(handleProdutosDisponibilidadeUpdate)
 
   const scrollToCategoria = (categoria: string) => {
     setCategoriaAtiva(categoria)
@@ -96,25 +138,48 @@ export default function Cardapio(): JSX.Element {
   /* =======================
      ADICIONAR PRODUTO
   ======================= */
+  // Categorias que permitem customização completa
+  const CATEGORIAS_CUSTOMIZAVEIS = ['Lanches', 'Macarrão', 'Omeletes']
+
   const handleAddItemClick = async (produto: any) => {
     if (!lojaAberta) {
       setErro('Estamos fechados no momento')
       return
     }
 
-    const addons = await productAddonsService.getByProduct(produto.id)
-    const extras = addons
-      .filter((a) => a.tipo === 'add')
-      .map((a) => ({
-        id: String(a.id),
-        nome: a.nome,
-        preco: Number(a.preco),
-        tipo: a.tipo,
-      }))
+    // Debug: mostrar categoria, extras e ingredientes
+    console.log('[DEBUG] Produto:', produto.nome, '| Categoria:', produto.categoria)
 
-    setExtrasDisponiveis(extras)
-    setProdutoSelecionado(produto)
-    setPromptAberto(true)
+    if (CATEGORIAS_CUSTOMIZAVEIS.includes(produto.categoria)) {
+      const addons = await productAddonsService.getByProduct(produto.id)
+      const extras = addons
+        .filter((a) => a.tipo === 'add')
+        .map((a) => ({
+          id: String(a.id),
+          nome: a.nome,
+          preco: Number(a.preco),
+          tipo: a.tipo,
+        }))
+      const temExtras = extras.length > 0
+      const temRemoviveis = Array.isArray(produto.ingredientes) && produto.ingredientes.length > 0
+
+      console.log('[DEBUG] Extras:', extras)
+      console.log('[DEBUG] Ingredientes removíveis:', produto.ingredientes)
+
+      setExtrasDisponiveis(extras)
+      setProdutoSelecionado(produto)
+      if (temExtras || temRemoviveis) {
+        setPromptAberto(true)
+      } else {
+        // Produto da categoria, mas sem extras/removíveis: só observação
+        setModalCustomizacaoAberto(true)
+      }
+    } else {
+      // Para outros produtos, só permite observação
+      setExtrasDisponiveis([])
+      setProdutoSelecionado(produto)
+      setModalCustomizacaoAberto(true)
+    }
   }
 
   const handlePromptNo = () => {
@@ -125,6 +190,7 @@ export default function Cardapio(): JSX.Element {
       name: produtoSelecionado.nome,
       price: produtoSelecionado.preco,
       qty: 1,
+      ingredientes_indisponiveis: ingredientesIndisponiveisHoje[String(produtoSelecionado.id)] || [],
     })
 
     setProdutoAdicionado(String(produtoSelecionado.id))
@@ -154,6 +220,7 @@ export default function Cardapio(): JSX.Element {
       qty: 1,
       observacoes: data.observacoes,
       extras: data.extras,
+      ingredientes_indisponiveis: data.ingredientes_indisponiveis,
     })
 
     setProdutoAdicionado(String(produtoSelecionado.id))
@@ -292,17 +359,18 @@ export default function Cardapio(): JSX.Element {
           margin: '0 auto',
         }}
       >
-        {Object.entries(categorias).map(([categoria, lista]) => (
+        {listaCategorias.map((categoria) => (
           <div
             key={categoria}
             ref={(el) => (categoriaRefs.current[categoria] = el)}
           >
             <CategorySection
               categoria={categoria}
-              itens={lista}
+              itens={Array.isArray(categorias[categoria]) ? categorias[categoria] : []}
               onAddItem={handleAddItemClick}
               lojaAberta={lojaAberta}
               produtoAdicionado={produtoAdicionado}
+              ingredientesIndisponiveisMap={ingredientesIndisponiveisHoje}
             />
           </div>
         ))}
@@ -432,6 +500,15 @@ export default function Cardapio(): JSX.Element {
                 <option value="pix">📱 PIX</option>  
               </select>
 
+          {formaPagamento === 'pix' && (
+            <PixKeyDisplay
+              pixKey={PIX_CONFIG.key}
+              keyType={PIX_CONFIG.keyType}
+              recipientName={PIX_CONFIG.recipientName}
+              amount={total}
+            />
+          )}
+
           {formaPagamento === 'dinheiro' && tipoEntrega !== 'local' && (
             <input
               placeholder="Troco para quanto?"
@@ -492,7 +569,8 @@ export default function Cardapio(): JSX.Element {
       {/* =======================
           MODAIS (NO FINAL)
          ======================= */}
-      {produtoSelecionado && (
+      {/* Modal de customização só para categorias customizáveis */}
+      {produtoSelecionado && CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) && (
         <CustomizationPrompt
           isOpen={promptAberto}
           produtoNome={produtoSelecionado.nome}
@@ -505,12 +583,14 @@ export default function Cardapio(): JSX.Element {
         />
       )}
 
+      {/* Modal de customização: se categoria customizável, mostra tudo; senão, só observações */}
       {produtoSelecionado && (
         <ProductCustomizationModal
           isOpen={modalCustomizacaoAberto}
           produto={produtoSelecionado}
-          extrasDisponiveis={extrasDisponiveis}
-          ingredientesRemoviveis={produtoSelecionado.ingredientes || []}
+          extrasDisponiveis={CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) ? extrasDisponiveis : []}
+          ingredientesRemoviveis={CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) ? (produtoSelecionado.ingredientes || []) : []}
+          ingredientesIndisponiveis={ingredientesIndisponiveisHoje[String(produtoSelecionado.id)] || []}
           onConfirm={handleConfirmCustomization}
           onClose={() => {
             setModalCustomizacaoAberto(false)

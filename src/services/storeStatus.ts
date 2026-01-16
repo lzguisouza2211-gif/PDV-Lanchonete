@@ -15,7 +15,6 @@ export const storeStatusService = {
       .single()
 
     if (error) {
-      console.error('Erro ao buscar status da loja:', error)
       return null
     }
 
@@ -29,7 +28,6 @@ export const storeStatusService = {
       .eq('id', 1)
 
     if (error) {
-      console.error('Erro ao atualizar status da loja:', error)
       return false
     }
 

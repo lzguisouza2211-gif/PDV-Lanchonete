@@ -8,18 +8,26 @@ export default function Sidebar() {
   }
 
   return (
-    <aside
-      style={{
-        width: 130,
-        background: '#fff',
-        borderRight: '1px solid #e5e7eb',
-        padding: 24,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 32,
-        boxShadow: '2px 0 8px rgba(0,0,0,0.04)',
-      }}
-    >
+
+      <aside
+        className="admin-sidebar"
+        style={{
+          width: 200,
+          background: '#fff',
+          borderRight: '1px solid #f0f0f0',
+          padding: '24px 24px 150px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 32,
+          boxShadow: 'none',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          height: '100vh',
+          overflowY: 'auto',
+          zIndex: 1000,
+        }}
+      >
       {/* LOGO / PERFIL */}
       <div
         style={{
@@ -163,10 +171,41 @@ export default function Sidebar() {
           <span style={{ fontSize: 20 }}>💰</span>
           Financeiro
         </NavLink>
+
+        <NavLink
+          to="/admin/gestao-cardapio"
+          style={({ isActive }) => ({
+            padding: '14px 16px',
+            borderRadius: 12,
+            textDecoration: 'none',
+            color: isActive ? '#c0392b' : '#666',
+            fontWeight: isActive ? 700 : 500,
+            background: isActive ? '#fef2f2' : 'transparent',
+            borderLeft: isActive ? '4px solid #c0392b' : '4px solid transparent',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            fontSize: 15,
+            transition: 'all 0.2s ease',
+          })}
+          onMouseEnter={(e) => {
+            if (!e.currentTarget.style.background.includes('fef2f2')) {
+              e.currentTarget.style.background = '#f9fafb'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!e.currentTarget.style.background.includes('fef2f2')) {
+              e.currentTarget.style.background = 'transparent'
+            }
+          }}
+        >
+          <span style={{ fontSize: 20 }}>🍽️</span>
+          Cardápio
+        </NavLink>
       </nav>
 
       {/* SAIR */}
-      <div style={{ marginTop: 'auto', paddingTop: 24, borderTop: '2px solid #f3f4f6' }}>
+      <div style={{ marginTop: 'auto', paddingTop: 24, paddingBottom: 48, borderTop: '2px solid #f3f4f6' }}>
         <button
           onClick={sair}
           style={{

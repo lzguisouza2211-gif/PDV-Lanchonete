@@ -4,8 +4,6 @@ import Admin from '../pages/admin/Admin'
 import AdminLogin from '../pages/admin/AdminLogin'
 import PrivateRoute from '../components/route/PrivateRoute'
 
-console.log('AppRoutes loaded')
-
 export default function AppRoutes() {
   return (
     <BrowserRouter>
