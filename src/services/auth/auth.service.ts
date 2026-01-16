@@ -1,5 +1,4 @@
 import { supabase } from '../supabaseClient';
-import { logger } from '../logger/logger';
 import { Role } from './roles';
 
 export type User = {
@@ -14,7 +13,6 @@ const hasSupabase = (supabase as any) && typeof (supabase as any).auth === 'obje
 export const authService = {
   async getCurrentUser(): Promise<User | null> {
     if (!hasSupabase) {
-      logger.warn('supabase not initialized - authService.getCurrentUser returns null');
       return null;
     }
     const { data: { user } = { user: null } } = await (supabase as any).auth.getUser().catch(() => ({ data: { user: null } }));
@@ -34,12 +32,10 @@ export const authService = {
 
   async signInWithEmail(email: string, password: string): Promise<User | null> {
     if (!hasSupabase) {
-      logger.warn('supabase not initialized - authService.signInWithEmail no-op');
       return null;
     }
     const { data, error } = await (supabase as any).auth.signInWithPassword({ email, password }).catch((e: any) => ({ data: null, error: e }));
     if (error) {
-      logger.error('authService.signInWithEmail error', error);
       return null;
     }
     if (!data?.user) return null;

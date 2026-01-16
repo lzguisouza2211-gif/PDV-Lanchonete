@@ -22,12 +22,15 @@ export default function Header() {
     <header
       style={{
         background: '#fff',
-        borderBottom: '1px solid #e5e7eb',
+        borderBottom: '1px solid #f0f0f0',
         padding: '20px 32px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+        boxShadow: 'none',
+        position: 'sticky',
+        top: 0,
+        zIndex: 1001,
       }}
     >
       {/* TÍTULO E DATA */}

@@ -14,6 +14,7 @@ export type PedidoPayload = {
     preco: number
     quantidade: number
     observacoes?: string
+    ingredientes_indisponiveis?: string[]
     extras?: Array<{
       nome: string
       preco: number
@@ -81,6 +82,7 @@ export function normalizePedidoPayload(
       preco: Number(item.price),
       quantidade: Number(item.qty),
       observacoes: item.observacoes,
+      ingredientes_indisponiveis: item.ingredientes_indisponiveis,
       extras: item.extras,
     })),
   }

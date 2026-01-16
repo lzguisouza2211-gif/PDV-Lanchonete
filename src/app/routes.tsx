@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import PrivateRoute from '../components/route/PrivateRoute'
 import AdminLayout from '../pages/admin/AdminLayout'
 import AdminDashboard from '../pages/admin/Dashboard'
@@ -16,6 +16,7 @@ export default function AppRoutes() {
         <Route path="/admin/login" element={<Login />} />
         
         <Route path="/admin" element={<PrivateRoute><AdminLayout /></PrivateRoute>}>
+          <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="pedidos" element={<AdminPedidos />} />
           <Route path="financeiro" element={<Financeiro />} />

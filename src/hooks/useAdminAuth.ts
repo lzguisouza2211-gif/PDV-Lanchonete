@@ -26,7 +26,6 @@ export function useAdminAuth() {
           .maybeSingle()
 
         if (error) {
-          console.error('Erro ao verificar admin:', error)
           setIsAdmin(false)
           return
         }

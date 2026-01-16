@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useCardapio } from '../../hooks/useCardapio'
 import { useCartWithPedidos } from '../../store/useCartWithPedidos'
 import { useStoreStatus } from '../../hooks/useStoreStatus'
@@ -90,7 +90,7 @@ export default function Cardapio(): JSX.Element {
   }, [categorias])
 
   useEffect(() => {
-    if (listaCategorias.length > 0 && !categoriaAtiva) {
+    if (listaCategorias.length > 0 && categoriaAtiva === null) {
       setCategoriaAtiva(listaCategorias[0])
     }
   }, [listaCategorias, categoriaAtiva])
@@ -108,16 +108,21 @@ export default function Cardapio(): JSX.Element {
     carregarIndisponiveis()
   }, [])
 
-  // Realtime/Polling para indisponibilidade de ingredientes
-  useIngredientesIndisponiveisRealtime((mapa) => {
+  // Callbacks memoizadas para evitar re-execução infinita dos hooks realtime
+  const handleIngredientesIndisponiveisUpdate = useCallback((mapa: Record<string, string[]>) => {
     setIngredientesIndisponiveisHoje(mapa)
-  })
+  }, [])
 
-  // Realtime/Polling para disponibilidade de produtos (habilitar/desabilitar)
-  useProdutosDisponibilidadeRealtime((itensAtualizados) => {
+  const handleProdutosDisponibilidadeUpdate = useCallback((itensAtualizados: any[]) => {
     setItens(itensAtualizados)
     console.log('📡 Cardápio atualizado em tempo real:', itensAtualizados.length, 'itens')
-  })
+  }, [])
+
+  // Realtime/Polling para indisponibilidade de ingredientes
+  useIngredientesIndisponiveisRealtime(handleIngredientesIndisponiveisUpdate)
+
+  // Realtime/Polling para disponibilidade de produtos (habilitar/desabilitar)
+  useProdutosDisponibilidadeRealtime(handleProdutosDisponibilidadeUpdate)
 
   const scrollToCategoria = (categoria: string) => {
     setCategoriaAtiva(categoria)
@@ -185,6 +190,7 @@ export default function Cardapio(): JSX.Element {
       name: produtoSelecionado.nome,
       price: produtoSelecionado.preco,
       qty: 1,
+      ingredientes_indisponiveis: ingredientesIndisponiveisHoje[String(produtoSelecionado.id)] || [],
     })
 
     setProdutoAdicionado(String(produtoSelecionado.id))
@@ -214,6 +220,7 @@ export default function Cardapio(): JSX.Element {
       qty: 1,
       observacoes: data.observacoes,
       extras: data.extras,
+      ingredientes_indisponiveis: data.ingredientes_indisponiveis,
     })
 
     setProdutoAdicionado(String(produtoSelecionado.id))
@@ -352,14 +359,14 @@ export default function Cardapio(): JSX.Element {
           margin: '0 auto',
         }}
       >
-        {Object.entries(categorias).map(([categoria, lista]) => (
+        {listaCategorias.map((categoria) => (
           <div
             key={categoria}
             ref={(el) => (categoriaRefs.current[categoria] = el)}
           >
             <CategorySection
               categoria={categoria}
-              itens={Array.isArray(lista) ? lista : []}
+              itens={Array.isArray(categorias[categoria]) ? categorias[categoria] : []}
               onAddItem={handleAddItemClick}
               lojaAberta={lojaAberta}
               produtoAdicionado={produtoAdicionado}

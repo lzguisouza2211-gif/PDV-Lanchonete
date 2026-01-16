@@ -1,458 +1,327 @@
-import { useState, useEffect } from 'react'
-import { cardapioService, ItemCardapio } from '../../services/api/cardapio.service'
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../services/supabaseClient';
+import { cardapioService } from '../../services/api/cardapio.service';
+import './GestaoCardapio.css';
 
-interface MenuItem {
-  id: string
-  nome: string
-  categoria: string
-  preco: number
-  disponivel: boolean
-  ingredientes?: string[]
+interface Produto {
+  id: number;
+  nome: string;
+  descricao: string;
+  preco: number;
+  categoria: string;
+  disponivel: boolean;
+  ingredientes?: string[];
 }
 
-export default function GestaoCardapio() {
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const [updating, setUpdating] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [priceDraft, setPriceDraft] = useState<Record<string, number>>({})
-  const [ingredientesIndisponiveis, setIngredientesIndisponiveis] = useState<Record<string, string[]>>({})
+interface IngredientesIndisponivelMap {
+  [produtoId: string]: string[];
+}
 
-  const carregarTodos = async () => {
-    try {
-      setLoading(true)
-      const itens = await cardapioService.listAll()
-      const indisponiveis = await cardapioService.listarIngredientesIndisponiveisHoje()
-      
-      const items = itens.map(item => ({
-        id: item.id,
-        nome: item.nome,
-        categoria: item.categoria,
-        preco: item.preco,
-        disponivel: item.disponivel ?? true,
-        ingredientes: item.ingredientes ?? [],
-      }))
-      
-      setMenuItems(items)
-      setIngredientesIndisponiveis(indisponiveis)
-      const drafts: Record<string, number> = {}
-      items.forEach(i => { drafts[i.id] = i.preco })
-      setPriceDraft(drafts)
-    } catch (error) {
-      console.error('Erro ao carregar cardápio:', error)
-      alert('Erro ao carregar cardápio')
-    } finally {
-      setLoading(false)
-    }
-  }
+const ORDEM_CATEGORIAS = [
+  'Lanches',
+  'Macarrão',
+  'Porções',
+  'Omeletes',
+  'Bebidas',
+  'Cervejas',
+  'Doces',
+];
+
+function GestaoCardapio() {
+  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string>('');
+  const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
+  const [editingPriceValue, setEditingPriceValue] = useState('');
+  const [ingredientesIndisponiveis, setIngredientesIndisponiveis] = useState<IngredientesIndisponivelMap>({});
 
   useEffect(() => {
-    carregarTodos()
-  }, [])
+    fetchProdutos();
+  }, []);
 
-  const handleToggleAvailability = async (id: string) => {
+  async function fetchProdutos() {
     try {
-      setUpdating(id)
-      // Atualização otimista - muda logo na UI
-      setMenuItems(prev => 
-        prev.map(item => 
-          item.id === id ? { ...item, disponivel: !item.disponivel } : item
-        )
-      )
-      // Depois sincroniza com banco
-      await cardapioService.toggleDisponibilidade(id)
-    } catch (error: any) {
-      console.error('Erro ao atualizar disponibilidade:', error)
-      // Recarrega se falhar
-      await carregarTodos()
-      alert(`Erro ao atualizar disponibilidade do produto:\n${error?.message}`)
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('cardapio')
+        .select('*')
+        .order('categoria', { ascending: true })
+        .order('nome', { ascending: true });
+
+      if (error) throw error;
+      
+      const produtosData = (data || []) as Produto[];
+      setProdutos(produtosData);
+      
+      // Carregar ingredientes indisponíveis
+      const indisponiveis = await cardapioService.listarIngredientesIndisponiveisHoje();
+      setIngredientesIndisponiveis(indisponiveis);
+      
+      if (produtosData && produtosData.length > 0) {
+        const categoriasUnicas = Array.from(new Set(produtosData.map(p => p.categoria)));
+        const primeiraCategoriaPreferencial = ORDEM_CATEGORIAS.find(cat => categoriasUnicas.includes(cat));
+        setCategoriaSelecionada(primeiraCategoriaPreferencial || categoriasUnicas[0]);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar produtos:', error);
+      alert('Erro ao carregar produtos');
     } finally {
-      setUpdating(null)
+      setLoading(false);
     }
   }
 
-  const handleSavePrice = async (id: string) => {
+  const handleToggleDisponibilidade = async (id: number, disponivel: boolean) => {
     try {
-      setUpdating(id)
-      const novoPreco = priceDraft[id]
-      // Atualização otimista
-      setMenuItems(prev =>
-        prev.map(item =>
-          item.id === id ? { ...item, preco: novoPreco } : item
-        )
-      )
-      // Sincroniza com banco
-      await cardapioService.atualizarPreco(id, novoPreco)
-    } catch (error: any) {
-      console.error('Erro ao atualizar preço:', error)
-      await carregarTodos()
-      alert(`Erro ao atualizar preço:\n${error?.message}`)
-    } finally {
-      setUpdating(null)
-    }
-  }
+      const { error } = await supabase
+        .from('cardapio')
+        .update({ disponivel })
+        .eq('id', id);
 
-  const handleToggleIngrediente = async (id: string, ingrediente: string) => {
+      if (error) throw error;
+      
+      setProdutos(produtos.map(p => 
+        p.id === id ? { ...p, disponivel } : p
+      ));
+    } catch (error) {
+      console.error('Erro ao atualizar disponibilidade:', error);
+      alert('Erro ao atualizar');
+    }
+  };
+
+  const handleSavePrice = async (id: number) => {
     try {
-      setUpdating(id)
-      const lista = ingredientesIndisponiveis[id] || []
-      const jaIndisponivel = lista.includes(ingrediente)
+      const novoPreco = parseFloat(editingPriceValue);
+      if (isNaN(novoPreco) || novoPreco <= 0) {
+        alert('Preço inválido');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('cardapio')
+        .update({ preco: novoPreco })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setProdutos(produtos.map(p => 
+        p.id === id ? { ...p, preco: novoPreco } : p
+      ));
+      setEditingPriceId(null);
+    } catch (error) {
+      console.error('Erro ao atualizar preço:', error);
+      alert('Erro ao atualizar preço');
+    }
+  };
+
+  const handleToggleIngrediente = async (produtoId: number | string, ingrediente: string) => {
+    try {
+      const idStr = String(produtoId);
+      const lista = ingredientesIndisponiveis[idStr] || [];
+      const jaIndisponivel = lista.includes(ingrediente);
       
       // Atualização otimista
       setIngredientesIndisponiveis(prev => ({
         ...prev,
-        [id]: jaIndisponivel
-          ? prev[id].filter(ing => ing !== ingrediente)
-          : [...(prev[id] || []), ingrediente]
-      }))
+        [idStr]: jaIndisponivel
+          ? prev[idStr].filter(ing => ing !== ingrediente)
+          : [...(prev[idStr] || []), ingrediente]
+      }));
       
       // Sincroniza com banco
-      await cardapioService.definirIngredienteIndisponivel(id, ingrediente, !jaIndisponivel)
-    } catch (error: any) {
-      console.error('Erro ao atualizar ingrediente:', error)
-      await carregarTodos()
-      alert(`Erro ao atualizar ingrediente:\n${error?.message}`)
-    } finally {
-      setUpdating(null)
+      await cardapioService.definirIngredienteIndisponivel(idStr, ingrediente, !jaIndisponivel);
+    } catch (error) {
+      console.error('Erro ao atualizar ingrediente:', error);
+      alert('Erro ao atualizar ingrediente');
+      // Recarregar
+      fetchProdutos();
     }
-  }
+  };
 
-  const getCategoryIcon = (categoria: string) => {
-    const icons: Record<string, string> = {
-      'Lanches': '🍔',
-      'Bebidas Quentes': '☕',
-      'Bebidas Frias': '🧊',
-      'Sobremesas': '🍰',
-      'Acompanhamentos': '🍟',
-    }
-    return icons[categoria] || '🍽️'
-  }
+  // Extrai ingredientes da descrição
+  const extrairIngredientes = (descricao: string): string[] => {
+    if (!descricao) return [];
+    // Divide por vírgula e limpa espaços
+    return descricao
+      .split(',')
+      .map(ing => ing.trim())
+      .filter(ing => ing.length > 0);
+  };
 
-  const categories = ['all', ...new Set(menuItems.map(item => item.categoria))]
-  
-  let filteredItems = selectedCategory === 'all'
-    ? menuItems
-    : menuItems.filter(item => item.categoria === selectedCategory)
-  
-  if (searchTerm) {
-    filteredItems = filteredItems.filter(item =>
-      item.nome.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  }
+  const categoriasOrdenadas = React.useMemo(() => {
+    const categoriasUnicas = Array.from(new Set(produtos.map(p => p.categoria)));
+    const ordenadas = ORDEM_CATEGORIAS.filter(cat => categoriasUnicas.includes(cat));
+    const restantes = categoriasUnicas.filter(cat => !ORDEM_CATEGORIAS.includes(cat));
+    return [...ordenadas, ...restantes];
+  }, [produtos]);
 
-  const disponiveisCount = menuItems.filter(i => i.disponivel).length
-  const indisponivelCount = menuItems.filter(i => !i.disponivel).length
+  const produtosFiltrados = produtos.filter(produto => {
+    const matchesCategoria = produto.categoria === categoriaSelecionada;
+    const matchesSearch = searchTerm === '' || 
+                         produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         produto.descricao.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCategoria && matchesSearch;
+  });
+
+  const produtosCategoria = produtos.filter(p => p.categoria === categoriaSelecionada);
+  const disponiveis = produtosCategoria.filter(p => p.disponivel).length;
+
+  if (loading) {
+    return (
+      <div className="admin-container">
+        <main className="admin-main">
+          <div style={{ padding: '2rem', textAlign: 'center' }}>
+            <p style={{ fontSize: '1.1rem', color: '#666' }}>Carregando...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 8px 0', color: '#1a1a1a' }}>
-          Gestão de Cardápio
-        </h1>
-        <p style={{ margin: 0, color: '#6b7280', fontSize: 14 }}>
-          Gerencie a disponibilidade de produtos do seu cardápio em tempo real
-        </p>
-      </div>
-
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '80px 20px', color: '#999' }}>
-          <p style={{ fontSize: 18, margin: 0 }}>Carregando cardápio...</p>
-        </div>
-      ) : (
-        <>
-          {/* Stats e Filtros */}
-          <div style={{
-            background: '#fff',
-            padding: '20px 24px',
-            borderRadius: '12px',
-            marginBottom: '24px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-          }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-              {/* Stats */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: '#10b981' }}>
-                  {disponiveisCount}
-                </div>
-                <div style={{ fontSize: 13, color: '#6b7280' }}>
-                  <div style={{ fontWeight: 600, color: '#374151' }}>Disponíveis</div>
-                  <div>produtos ativos</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: '#ef4444' }}>
-                  {indisponivelCount}
-                </div>
-                <div style={{ fontSize: 13, color: '#6b7280' }}>
-                  <div style={{ fontWeight: 600, color: '#374151' }}>Indisponíveis</div>
-                  <div>produtos ocultos</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: '#3b82f6' }}>
-                  {menuItems.length}
-                </div>
-                <div style={{ fontSize: 13, color: '#6b7280' }}>
-                  <div style={{ fontWeight: 600, color: '#374151' }}>Total</div>
-                  <div>produtos cadastrados</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Search */}
-            <input
-              type="text"
-              placeholder="Buscar produto por nome..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontFamily: 'inherit',
-              }}
-            />
-          </div>
-
-          {/* Filter Tabs */}
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '24px',
-            borderBottom: '1px solid #e5e7eb',
-            paddingBottom: '12px',
-            overflowX: 'auto',
-          }}>
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  padding: '8px 16px',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: selectedCategory === cat ? '#c0392b' : '#6b7280',
-                  cursor: 'pointer',
-                  borderBottom: selectedCategory === cat ? '2px solid #c0392b' : '2px solid transparent',
-                  transition: 'all 0.2s ease',
-                  whiteSpace: 'nowrap',
-                }}
-                onMouseEnter={(e) => {
-                  if (selectedCategory !== cat) {
-                    e.currentTarget.style.color = '#374151'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (selectedCategory !== cat) {
-                    e.currentTarget.style.color = '#6b7280'
-                  }
-                }}
-              >
-                {cat === 'all' ? `Todos (${menuItems.length})` : `${cat} (${menuItems.filter(i => i.categoria === cat).length})`}
-              </button>
-            ))}
-          </div>
-
-          {/* Items Grid */}
-          {filteredItems.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '60px 20px',
-              color: '#9ca3af',
-              background: '#f9fafb',
-              borderRadius: '12px',
-            }}>
-              <p style={{ fontSize: 16, margin: 0 }}>
-                {searchTerm ? '❌ Nenhum produto encontrado' : '📭 Nenhum produto nesta categoria'}
+    <div className="admin-container">
+      <main className="admin-main gestao-layout">
+        <section className="gestao-main">
+          {/* Header */}
+          <div className="gestao-header">
+            <div>
+              <h1 className="gestao-title">{categoriaSelecionada}</h1>
+              <p className="gestao-subtitle">
+                {disponiveis} de {produtosCategoria.length} produtos disponíveis
               </p>
             </div>
-          ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-              gap: '16px',
-            }}>
-              {filteredItems.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    background: item.disponivel ? '#fff' : '#f9fafb',
-                    border: `1px solid ${item.disponivel ? '#e5e7eb' : '#d1d5db'}`,
-                    borderRadius: '12px',
-                    padding: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    transition: 'all 0.2s ease',
-                    opacity: item.disponivel ? 1 : 0.6,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (item.disponivel) {
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = 'none'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                  }}
+
+            <div className="gestao-header-actions">
+              <div className="gestao-categoria-select-wrapper">
+                <label className="gestao-categoria-label">Categoria</label>
+                <select
+                  value={categoriaSelecionada}
+                  onChange={(e) => setCategoriaSelecionada(e.target.value)}
+                  className="gestao-categoria-select"
                 >
-                  {/* Header */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                      <div style={{
-                        width: '44px',
-                        height: '44px',
-                        borderRadius: '8px',
-                        background: '#f3f4f6',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '24px',
-                        flexShrink: 0,
-                      }}>
-                        {getCategoryIcon(item.categoria)}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{
-                          fontWeight: 700,
-                          fontSize: '15px',
-                          color: '#1a1a1a',
-                          lineHeight: '1.3',
-                        }}>
-                          {item.nome}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>
-                          {item.categoria}
-                        </div>
-                      </div>
-                    </div>
+                  {categoriasOrdenadas.map(cat => {
+                    const total = produtos.filter(p => p.categoria === cat).length;
+                    const dispo = produtos.filter(p => p.categoria === cat && p.disponivel).length;
+                    return (
+                      <option key={cat} value={cat}>
+                        {cat} ({dispo}/{total})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              
+              <div className="gestao-search">
+                <input
+                  type="text"
+                  placeholder="Buscar produto..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="search-input"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Produtos Grid */}
+          {produtosFiltrados.length === 0 ? (
+            <div className="gestao-empty">
+              <p>Nenhum produto encontrado</p>
+            </div>
+          ) : (
+            <div className="gestao-grid">
+              {produtosFiltrados.map(produto => (
+                <div key={produto.id} className="gestao-card">
+                  {/* Nome */}
+                  <div className="card-header">
+                    <h4 className="card-nome">{produto.nome}</h4>
                   </div>
 
                   {/* Preço */}
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={priceDraft[item.id] ?? item.preco}
-                        onChange={(e) => setPriceDraft(prev => ({ ...prev, [item.id]: Number(e.target.value) }))}
-                        style={{
-                          flex: 1,
-                          padding: '10px 12px',
-                          borderRadius: 8,
-                          border: '1px solid #e5e7eb',
-                          fontSize: 14,
-                        }}
-                      />
-                      <button
-                        onClick={() => handleSavePrice(item.id)}
-                        disabled={updating === item.id}
-                        style={{
-                          padding: '10px 14px',
-                          borderRadius: 8,
-                          border: 'none',
-                          background: '#c0392b',
-                          color: '#fff',
-                          fontWeight: 600,
-                          cursor: updating === item.id ? 'wait' : 'pointer',
-                          opacity: updating === item.id ? 0.7 : 1,
+                  <div className="card-preco-section">
+                    {editingPriceId === produto.id ? (
+                      <div className="preco-edit">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editingPriceValue}
+                          onChange={(e) => setEditingPriceValue(e.target.value)}
+                          className="preco-input"
+                          autoFocus
+                        />
+                        <button 
+                          onClick={() => handleSavePrice(produto.id)}
+                          className="preco-btn-save"
+                        >
+                          ✓
+                        </button>
+                        <button 
+                          onClick={() => setEditingPriceId(null)}
+                          className="preco-btn-cancel"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div 
+                        className="preco-display"
+                        onClick={() => {
+                          setEditingPriceId(produto.id);
+                          setEditingPriceValue(produto.preco.toFixed(2));
                         }}
                       >
-                        {updating === item.id ? 'Salvando...' : 'Salvar preço'}
-                      </button>
-                    </div>
-
-                    {/* Ingredientes indisponíveis hoje */}
-                    {item.ingredientes && item.ingredientes.length > 0 && (
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: '#374151', marginBottom: 8 }}>
-                          Ingredientes indisponíveis (hoje)
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                          {item.ingredientes.map((ing) => {
-                            const indispo = (ingredientesIndisponiveis[item.id] || []).includes(ing)
-                            return (
-                              <button
-                                key={ing}
-                                onClick={() => handleToggleIngrediente(item.id, ing)}
-                                disabled={updating === item.id}
-                                style={{
-                                  border: '1px solid ' + (indispo ? '#ef4444' : '#e5e7eb'),
-                                  background: indispo ? '#fee2e2' : '#fff',
-                                  color: indispo ? '#991b1b' : '#374151',
-                                  padding: '6px 10px',
-                                  borderRadius: 16,
-                                  fontSize: 12,
-                                  cursor: updating === item.id ? 'wait' : 'pointer',
-                                }}
-                              >
-                                {indispo ? '✗ ' : ''}{ing}
-                              </button>
-                            )
-                          })}
-                        </div>
+                        <span className="preco-label">Preço:</span>
+                        <span className="preco-valor">R$ {produto.preco.toFixed(2)}</span>
                       </div>
                     )}
-
-                  {/* Status Badge */}
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    background: item.disponivel ? '#dcfce7' : '#fee2e2',
-                    color: item.disponivel ? '#166534' : '#991b1b',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    width: 'fit-content',
-                  }}>
-                    <span>{item.disponivel ? '✓' : '✗'}</span>
-                    {item.disponivel ? 'Disponível' : 'Indisponível'}
                   </div>
 
-                  {/* Toggle Button */}
-                  <button
-                    onClick={() => handleToggleAvailability(item.id)}
-                    disabled={updating === item.id}
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      fontWeight: 600,
-                      fontSize: '14px',
-                      cursor: updating === item.id ? 'wait' : 'pointer',
-                      transition: 'all 0.2s ease',
-                      opacity: updating === item.id ? 0.6 : 1,
-                      background: item.disponivel ? '#fee2e2' : '#dcfce7',
-                      color: item.disponivel ? '#991b1b' : '#166534',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (updating !== item.id) {
-                        e.currentTarget.style.opacity = '0.8'
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = updating === item.id ? '0.6' : '1'
-                    }}
-                  >
-                    {updating === item.id ? '⏳ Atualizando...' : (item.disponivel ? '❌ Desabilitar' : '✓ Habilitar')}
-                  </button>
+                  {/* Status Buttons */}
+                  <div className="card-status">
+                    <button
+                      className={`status-btn-verde ${produto.disponivel ? 'ativo' : ''}`}
+                      onClick={() => handleToggleDisponibilidade(produto.id, true)}
+                    >
+                      ✓ Disponível
+                    </button>
+                    <button
+                      className={`status-btn-vermelho ${!produto.disponivel ? 'ativo' : ''}`}
+                      onClick={() => handleToggleDisponibilidade(produto.id, false)}
+                    >
+                      ✕ Indisponível
+                    </button>
+                  </div>
+
+                  {/* Ingredientes - Direto da descrição */}
+                  {produto.descricao && (
+                    <div className="card-ingredientes-inline">
+                      <div className="ingredientes-label">Ingredientes:</div>
+                      <div className="ingredientes-buttons">
+                        {extrairIngredientes(produto.descricao).map(ing => {
+                          const indispo = (ingredientesIndisponiveis[String(produto.id)] || []).includes(ing);
+                          return (
+                            <button
+                              key={ing}
+                              className={`ingrediente-badge ${indispo ? 'indisponivel' : 'disponivel'}`}
+                              onClick={() => handleToggleIngrediente(produto.id, ing)}
+                              title={indispo ? 'Marcar como disponível' : 'Marcar como indisponível'}
+                            >
+                              {ing}
+                              <span className="badge-icon">{indispo ? '✕' : '✓'}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
-        </>
-      )}
+        </section>
+      </main>
     </div>
-  )
+  );
 }
+
+export default GestaoCardapio;

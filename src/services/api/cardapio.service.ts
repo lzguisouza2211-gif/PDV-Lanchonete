@@ -13,38 +13,22 @@ export type ItemCardapio = {
 
 class CardapioService {
   async list(): Promise<ItemCardapio[]> {
-    // Primeira tentativa: ordenar por ordem_categoria (se existir)
-    let { data, error } = await supabase
+    // ⚡ Otimizado: Remover ordem_categoria (causa erro + retry lento)
+    // Usar apenas categoria + nome para ordenação
+    const { data, error } = await supabase
       .from('cardapio')
       .select('id, nome, preco, categoria, ativo, descricao, ingredientes, disponivel')
       .eq('ativo', true)
       .eq('disponivel', true)
-      .order('ordem_categoria', { ascending: true })
+      .order('categoria', { ascending: true })
       .order('nome', { ascending: true })
 
-    // Fallback: se a coluna ordem_categoria não existir no ambiente, reexecuta sem ela
     if (error) {
-      const msg = String(error.message || '')
-      const isColMissing = msg.includes('ordem_categoria') || msg.includes('undefined column') || msg.includes('42703')
-      if (isColMissing) {
-        console.warn('[CardapioService.list] Coluna ordem_categoria ausente. Aplicando ordenação alternativa.')
-        const retry = await supabase
-          .from('cardapio')
-          .select('id, nome, preco, categoria, ativo, descricao, ingredientes, disponivel')
-          .eq('ativo', true)
-          .eq('disponivel', true)
-          .order('categoria', { ascending: true })
-          .order('nome', { ascending: true })
-        data = retry.data
-        error = retry.error
-      }
-    }
-
-    if (error) {
+      console.error('❌ Erro ao carregar cardápio:', error.message)
       throw error
     }
 
-    console.log('📥 Dados recebidos do Supabase (primeiro item):', data?.[0])
+    console.log('📥 Cardápio carregado:', data?.length, 'itens')
 
     // Parse ingredientes JSON se existir
     return (data || []).map((item: any) => ({
@@ -59,37 +43,20 @@ class CardapioService {
   }
 
   async listAll(): Promise<ItemCardapio[]> {
-    // Método para admin ver TODOS os produtos (ativos mas sem filtro de disponivel)
-    // Primeira tentativa: ordenar por ordem_categoria (se existir)
-    let { data, error } = await supabase
+    // Método para admin ver TODOS os produtos (ativos)
+    const { data, error } = await supabase
       .from('cardapio')
       .select('id, nome, preco, categoria, ativo, descricao, ingredientes, disponivel')
       .eq('ativo', true)
-      .order('ordem_categoria', { ascending: true })
+      .order('categoria', { ascending: true })
       .order('nome', { ascending: true })
 
-    // Fallback: se a coluna ordem_categoria não existir, reexecuta sem ela
     if (error) {
-      const msg = String(error.message || '')
-      const isColMissing = msg.includes('ordem_categoria') || msg.includes('undefined column') || msg.includes('42703')
-      if (isColMissing) {
-        console.warn('[CardapioService.listAll] Coluna ordem_categoria ausente. Aplicando ordenação alternativa.')
-        const retry = await supabase
-          .from('cardapio')
-          .select('id, nome, preco, categoria, ativo, descricao, ingredientes, disponivel')
-          .eq('ativo', true)
-          .order('categoria', { ascending: true })
-          .order('nome', { ascending: true })
-        data = retry.data
-        error = retry.error
-      }
-    }
-
-    if (error) {
+      console.error('❌ Erro ao carregar cardápio completo:', error.message)
       throw error
     }
 
-    console.log('📥 Dados (Admin - Todos) recebidos do Supabase:', data?.length, 'itens')
+    console.log('📥 Cardápio admin carregado:', data?.length, 'itens')
 
     // Parse ingredientes JSON se existir
     return (data || []).map((item: any) => ({
