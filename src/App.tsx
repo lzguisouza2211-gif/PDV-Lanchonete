@@ -1,43 +1,7 @@
-import { useEffect } from 'react'
 import AppRoutes from './app/AppRoutes'
-import { supabase } from './services/supabaseClient'
-import { usePedidosStore } from './store/usePedidosStore'
 
+// ⚠️ ARQUIVO LEGADO - NÃO ESTÁ SENDO USADO
+// O entry point real é src/main.tsx -> src/app/routes.tsx
 export default function App() {
-  useEffect(() => {
-    const { addPedido, updatePedido } = usePedidosStore.getState()
-
-    const channel = supabase
-      .channel('pedidos-realtime')
-
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pedidos' },
-        (payload) => {
-          const pedido = payload.new as any
-
-          addPedido(pedido)
-
-          // 🔊 SOM GLOBAL (admin aberto)
-          const audio = new Audio('/notification.mp3')
-          audio.play().catch(() => {})
-        }
-      )
-
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'pedidos' },
-        (payload) => {
-          updatePedido(payload.new as any)
-        }
-      )
-
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
-
   return <AppRoutes />
 }

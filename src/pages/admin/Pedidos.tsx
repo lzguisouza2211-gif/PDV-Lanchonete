@@ -11,8 +11,40 @@ export default function PedidosAdmin() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const initializedRef = useRef(false)
   const statusChangeRef = useRef<{ [key: number]: string }>({})
-  const [audioLiberado, setAudioLiberado] = useState(false)
+  const audioUnlockedRef = useRef(false)
   const [loading, setLoading] = useState(true)
+
+  // 🔊 Inicializar e desbloquear áudio
+  useEffect(() => {
+    // Criar áudio uma vez
+    audioRef.current = new Audio('/notification.mp3')
+    audioRef.current.volume = 1
+
+    // Desbloquear áudio com interação do usuário (requerido pelos browsers)
+    const unlockAudio = () => {
+      if (!audioRef.current || audioUnlockedRef.current) return
+
+      audioRef.current
+        .play()
+        .then(() => {
+          audioRef.current?.pause()
+          audioRef.current!.currentTime = 0
+          audioUnlockedRef.current = true
+          console.log('✅ Áudio desbloqueado para notificações')
+        })
+        .catch((err) => {
+          console.warn('⚠️ Não foi possível desbloquear áudio:', err)
+        })
+
+      window.removeEventListener('click', unlockAudio)
+    }
+
+    window.addEventListener('click', unlockAudio)
+
+    return () => {
+      window.removeEventListener('click', unlockAudio)
+    }
+  }, [])
 
   // 📥 Carregar pedidos iniciais com otimização
   useEffect(() => {
@@ -43,6 +75,8 @@ export default function PedidosAdmin() {
 
   // 📡 Realtime
   useEffect(() => {
+    console.log('🔌 Conectando ao canal de pedidos em tempo real...')
+    
     const channel = supabase
       .channel('admin-pedidos')
 
@@ -50,6 +84,7 @@ export default function PedidosAdmin() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'pedidos' },
         (payload) => {
+          console.log('🆕 Novo pedido recebido via realtime:', payload.new)
           const novoPedido = payload.new as any
           addPedido(novoPedido)
 
@@ -64,9 +99,15 @@ export default function PedidosAdmin() {
             })
           }
 
-          // 🔊 Som (se autorizado)
-          if (audioRef.current) {
-            audioRef.current.play().catch(() => {})
+          // 🔊 Som (se desbloqueado)
+          console.log('🔊 Tentando tocar som... Desbloqueado:', audioUnlockedRef.current)
+          if (audioRef.current && audioUnlockedRef.current) {
+            audioRef.current.currentTime = 0
+            audioRef.current.play().catch((err) => {
+              console.error('❌ Erro ao tocar som de notificação:', err)
+            })
+          } else if (!audioUnlockedRef.current) {
+            console.warn('⚠️ Áudio ainda não foi desbloqueado. Clique na página primeiro!')
           }
         }
       )
@@ -104,6 +145,35 @@ export default function PedidosAdmin() {
       Notification.requestPermission()
     }
   }, [])
+
+  // Função para atualizar status do pedido (definir ANTES do useMemo)
+  const handleChangeStatus = useCallback(
+    async (id: number, novoStatus: string) => {
+      try {
+        // Marca que foi mudança local para evitar dupla atualização do realtime
+        statusChangeRef.current[id] = novoStatus
+
+        // Atualização otimista na UI
+        const pedidoAtual = pedidos.find(p => p.id === id)
+        if (pedidoAtual) {
+          updatePedido({ ...pedidoAtual, status: novoStatus })
+        }
+
+        // Atualizar no banco via hook
+        const sucesso = await atualizarStatus(id, novoStatus)
+
+        if (!sucesso) {
+          alert('Erro ao atualizar status')
+          delete statusChangeRef.current[id]
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar status:', error)
+        alert('Erro ao atualizar status')
+        delete statusChangeRef.current[id]
+      }
+    },
+    [pedidos, updatePedido, atualizarStatus]
+  )
 
   // Memoizar lista de pedidos para evitar re-renders desnecessários
   const pedidosRenderizados = useMemo(() => {
@@ -191,42 +261,45 @@ export default function PedidosAdmin() {
     ))
   }, [pedidos, handleChangeStatus])
 
-  // Função para atualizar status do pedido
-  const handleChangeStatus = useCallback(
-    async (id: number, novoStatus: string) => {
-      try {
-        // Marca que foi mudança local para evitar dupla atualização do realtime
-        // Mantém marcado enquanto a requisição vai pra API
-        statusChangeRef.current[id] = novoStatus
-
-        // Atualização otimista na UI
-        const pedidoAtual = pedidos.find(p => p.id === id)
-        if (pedidoAtual) {
-          updatePedido({ ...pedidoAtual, status: novoStatus })
-        }
-
-        // Atualizar no banco via hook
-        const sucesso = await atualizarStatus(id, novoStatus)
-
-        if (!sucesso) {
-          alert('Erro ao atualizar status')
-          delete statusChangeRef.current[id]
-        }
-        // Limpar após resposta do servidor (realtime já terá sido processado)
-      } catch (error) {
-        console.error('Erro ao atualizar status:', error)
-        alert('Erro ao atualizar status')
-        delete statusChangeRef.current[id]
-      }
-    },
-    [pedidos, updatePedido, atualizarStatus]
-  )
-
   return (
     <div style={{ padding: 24 }}>
-      <audio ref={audioRef} src="/novo-pedido.mp3" preload="auto" />
-      
-      <h1>📋 Pedidos em tempo real</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <h1>📋 Pedidos em tempo real</h1>
+        
+        <button
+          onClick={() => {
+            console.log('🧪 Teste de som...')
+            console.log('Áudio criado:', !!audioRef.current)
+            console.log('Áudio desbloqueado:', audioUnlockedRef.current)
+            
+            if (!audioRef.current) {
+              alert('❌ Áudio não foi criado!')
+              return
+            }
+            
+            if (!audioUnlockedRef.current) {
+              alert('⚠️ Clique na página para desbloquear o áudio primeiro!')
+              return
+            }
+            
+            audioRef.current.currentTime = 0
+            audioRef.current.play()
+              .then(() => alert('✅ Som tocado com sucesso!'))
+              .catch(err => alert('❌ Erro: ' + err.message))
+          }}
+          style={{
+            padding: '10px 20px',
+            background: '#3498db',
+            color: 'white',
+            border: 'none',
+            borderRadius: 8,
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          🔊 Testar Som
+        </button>
+      </div>
 
       {loading && <p>⏳ Carregando pedidos...</p>}
 
