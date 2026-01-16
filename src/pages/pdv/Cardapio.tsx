@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useCardapio } from '../../hooks/useCardapio'
 import { useCartWithPedidos } from '../../store/useCartWithPedidos'
 import { useStoreStatus } from '../../hooks/useStoreStatus'
@@ -108,16 +108,21 @@ export default function Cardapio(): JSX.Element {
     carregarIndisponiveis()
   }, [])
 
-  // Realtime/Polling para indisponibilidade de ingredientes
-  useIngredientesIndisponiveisRealtime((mapa) => {
+  // Callbacks memoizadas para evitar re-execução infinita dos hooks realtime
+  const handleIngredientesIndisponiveisUpdate = useCallback((mapa: Record<string, string[]>) => {
     setIngredientesIndisponiveisHoje(mapa)
-  })
+  }, [])
 
-  // Realtime/Polling para disponibilidade de produtos (habilitar/desabilitar)
-  useProdutosDisponibilidadeRealtime((itensAtualizados) => {
+  const handleProdutosDisponibilidadeUpdate = useCallback((itensAtualizados: any[]) => {
     setItens(itensAtualizados)
     console.log('📡 Cardápio atualizado em tempo real:', itensAtualizados.length, 'itens')
-  })
+  }, [])
+
+  // Realtime/Polling para indisponibilidade de ingredientes
+  useIngredientesIndisponiveisRealtime(handleIngredientesIndisponiveisUpdate)
+
+  // Realtime/Polling para disponibilidade de produtos (habilitar/desabilitar)
+  useProdutosDisponibilidadeRealtime(handleProdutosDisponibilidadeUpdate)
 
   const scrollToCategoria = (categoria: string) => {
     setCategoriaAtiva(categoria)
