@@ -2,6 +2,7 @@ import { CartItem } from '../store/useCart'
 
 export type PedidoPayload = {
   cliente: string
+  telefone: string | null
   tipoentrega: string | null
   endereco: string | null
   formapagamento: string | null
@@ -28,6 +29,7 @@ export type PedidoPayload = {
 export function normalizePedidoPayload(
   input: {
     cliente: string
+    telefone?: string
     tipoEntrega?: string
     endereco?: string
     formaPagamento?: string
@@ -38,6 +40,15 @@ export function normalizePedidoPayload(
 ): PedidoPayload {
   if (!input.cliente?.trim()) {
     throw new Error('Nome do cliente é obrigatório')
+  }
+
+  if (!input.telefone?.trim()) {
+    throw new Error('Telefone é obrigatório para notificações WhatsApp')
+  }
+
+  const telefone = input.telefone.replace(/\D/g, '')
+  if (telefone.length < 10 || telefone.length > 11) {
+    throw new Error('Telefone inválido. Use formato: (11) 98765-4321')
   }
 
   if (items.length === 0) {
@@ -69,6 +80,7 @@ export function normalizePedidoPayload(
 
   return {
     cliente: input.cliente.trim(),
+    telefone: input.telefone.replace(/\D/g, ''),
     tipoentrega: input.tipoEntrega || null,
     endereco,
     formapagamento: input.formaPagamento || null,

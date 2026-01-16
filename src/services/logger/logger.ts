@@ -4,10 +4,11 @@
  */
 type LogArgs = Array<unknown>;
 
+const isDev = typeof import.meta !== 'undefined' ? !!import.meta.env?.DEV : true;
+
 export const logger = {
   info: (...args: LogArgs) => {
-    // centralized place to adjust levels/format
-    // keep minimal for now
+    if (!isDev) return;
     // eslint-disable-next-line no-console
     console.info('[info]', ...args);
   },

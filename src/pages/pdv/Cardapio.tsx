@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useCardapio } from '../../hooks/useCardapio'
 import { useCartWithPedidos } from '../../store/useCartWithPedidos'
 import { useStoreStatus } from '../../hooks/useStoreStatus'
@@ -11,6 +11,15 @@ import ProductCustomizationModal, {
 } from '../../components/pdv/ProductCustomizationModal'
 import CustomizationPrompt from '../../components/pdv/CustomizationPrompt'
 import { productAddonsService } from '../../services/productAddons'
+<<<<<<< Updated upstream
+=======
+import { cardapioService } from '../../services/api/cardapio.service'
+import PixKeyDisplay from '../../components/pdv/PixKeyDisplay'
+import { PIX_CONFIG } from '../../config/pix'
+import { useIngredientesIndisponiveisRealtime } from '../../hooks/useIngredientesIndisponiveisRealtime'
+import { useProdutosDisponibilidadeRealtime } from '../../hooks/useProdutosDisponibilidadeRealtime'
+import { logger } from '../../services/logger/logger'
+>>>>>>> Stashed changes
 
 export default function Cardapio(): JSX.Element {
   const { itens, loading, error } = useCardapio()
@@ -18,6 +27,7 @@ export default function Cardapio(): JSX.Element {
   const { isOpen: lojaAberta, loading: statusLoading } = useStoreStatus()
 
   const [nome, setNome] = useState('')
+  const [telefone, setTelefone] = useState('')
   const [tipoEntrega, setTipoEntrega] =
     useState<'retirada' | 'entrega' | 'local'>('retirada')
   const [endereco, setEndereco] = useState('')
@@ -82,6 +92,38 @@ export default function Cardapio(): JSX.Element {
     }
   }, [listaCategorias, categoriaAtiva])
 
+<<<<<<< Updated upstream
+=======
+  useEffect(() => {
+    const carregarIndisponiveis = async () => {
+      try {
+        const mapa = await cardapioService.listarIngredientesIndisponiveisHoje()
+        setIngredientesIndisponiveisHoje(mapa)
+      } catch (err) {
+        logger.error('Erro ao carregar ingredientes indisponíveis para hoje:', err)
+      }
+    }
+
+    carregarIndisponiveis()
+  }, [])
+
+  // Memoiza callbacks para evitar re-subscriptions nos hooks de realtime
+  const handleIngredientesUpdate = useCallback((mapa: Record<string, string[]>) => {
+    setIngredientesIndisponiveisHoje(mapa)
+  }, [])
+
+  const handleProdutosUpdate = useCallback((itensAtualizados: any[]) => {
+    setItens(itensAtualizados)
+    logger.info('📡 Cardápio atualizado em tempo real:', itensAtualizados.length, 'itens')
+  }, [])
+
+  // Realtime/Polling para indisponibilidade de ingredientes
+  useIngredientesIndisponiveisRealtime(handleIngredientesUpdate)
+
+  // Realtime/Polling para disponibilidade de produtos (habilitar/desabilitar)
+  useProdutosDisponibilidadeRealtime(handleProdutosUpdate)
+
+>>>>>>> Stashed changes
   const scrollToCategoria = (categoria: string) => {
     setCategoriaAtiva(categoria)
     const el = categoriaRefs.current[categoria]
@@ -102,6 +144,7 @@ export default function Cardapio(): JSX.Element {
       return
     }
 
+<<<<<<< Updated upstream
     const addons = await productAddonsService.getByProduct(produto.id)
     const extras = addons
       .filter((a) => a.tipo === 'add')
@@ -115,6 +158,41 @@ export default function Cardapio(): JSX.Element {
     setExtrasDisponiveis(extras)
     setProdutoSelecionado(produto)
     setPromptAberto(true)
+=======
+    // Debug: mostrar categoria, extras e ingredientes
+logger.info('[DEBUG] Produto:', produto.nome, '| Categoria:', produto.categoria)
+
+    if (CATEGORIAS_CUSTOMIZAVEIS.includes(produto.categoria)) {
+      const addons = await productAddonsService.getByProduct(produto.id)
+      const extras = addons
+        .filter((a) => a.tipo === 'add')
+        .map((a) => ({
+          id: String(a.id),
+          nome: a.nome,
+          preco: Number(a.preco),
+          tipo: a.tipo,
+        }))
+      const temExtras = extras.length > 0
+      const temRemoviveis = Array.isArray(produto.ingredientes) && produto.ingredientes.length > 0
+
+      logger.info('[DEBUG] Extras:', extras)
+      logger.info('[DEBUG] Ingredientes removíveis:', produto.ingredientes)
+
+      setExtrasDisponiveis(extras)
+      setProdutoSelecionado(produto)
+      if (temExtras || temRemoviveis) {
+        setPromptAberto(true)
+      } else {
+        // Produto da categoria, mas sem extras/removíveis: só observação
+        setModalCustomizacaoAberto(true)
+      }
+    } else {
+      // Para outros produtos, só permite observação
+      setExtrasDisponiveis([])
+      setProdutoSelecionado(produto)
+      setModalCustomizacaoAberto(true)
+    }
+>>>>>>> Stashed changes
   }
 
   const handlePromptNo = () => {
@@ -175,6 +253,7 @@ export default function Cardapio(): JSX.Element {
     try {
       await criarPedido({
         cliente: nome,
+        telefone: telefone,
         tipoEntrega,
         endereco: tipoEntrega === 'entrega' ? endereco : undefined,
         formaPagamento,
@@ -185,6 +264,7 @@ export default function Cardapio(): JSX.Element {
       setCarrinhoAberto(false)
       setSucesso(true)
       setNome('')
+      setTelefone('')
       setEndereco('')
       setTroco('')
     } catch (e: any) {
@@ -355,7 +435,28 @@ export default function Cardapio(): JSX.Element {
             disabled={enviando}
             style={{
               width: '100%',
-              boxSizing: 'border-box', // 👈 ESSENCIAL
+              boxSizing: 'border-box',
+              marginBottom: 12,
+              padding: 14,
+              fontSize: 16,
+              borderRadius: 10,
+              border: '1px solid #ddd',
+              background: '#fff',
+            }}
+          />
+
+          <input
+            placeholder="Telefone (WhatsApp) *"
+            value={telefone}
+            onChange={(e) => {
+              const cleaned = e.target.value.replace(/\D/g, '')
+              setTelefone(cleaned)
+            }}
+            disabled={enviando}
+            maxLength={11}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
               marginBottom: 12,
               padding: 14,
               fontSize: 16,
@@ -468,14 +569,14 @@ export default function Cardapio(): JSX.Element {
 
           <button
             onClick={finalizar}
-            disabled={enviando || !nome.trim() || items.length === 0}
+            disabled={enviando || !nome.trim() || !telefone.trim() || telefone.length < 10 || items.length === 0}
             style={{
               width: '100%',
               padding: 16,
               borderRadius: 10,
               border: 'none',
               background:
-                enviando || !nome.trim() || items.length === 0
+                enviando || !nome.trim() || !telefone.trim() || telefone.length < 10 || items.length === 0
                   ? '#95a5a6'
                   : '#27ae60',
               color: '#fff',
