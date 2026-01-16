@@ -190,6 +190,7 @@ export default function Cardapio(): JSX.Element {
       name: produtoSelecionado.nome,
       price: produtoSelecionado.preco,
       qty: 1,
+      categoria: produtoSelecionado.categoria,
       ingredientes_indisponiveis: ingredientesIndisponiveisHoje[String(produtoSelecionado.id)] || [],
     })
 
@@ -218,6 +219,7 @@ export default function Cardapio(): JSX.Element {
       name: produtoSelecionado.nome,
       price: produtoSelecionado.preco + precoExtras,
       qty: 1,
+      categoria: produtoSelecionado.categoria,
       observacoes: data.observacoes,
       extras: data.extras,
       ingredientes_indisponiveis: data.ingredientes_indisponiveis,

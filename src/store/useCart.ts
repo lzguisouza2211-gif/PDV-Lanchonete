@@ -6,6 +6,7 @@ export type CartItem = {
   name: string
   price: number
   qty: number
+  categoria?: string
   observacoes?: string
   ingredientes_indisponiveis?: string[]
   extras?: ExtraItem[]

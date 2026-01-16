@@ -91,11 +91,8 @@ export default function ProductCustomizationModal({
   useEffect(() => {
     if (!isOpen) return
 
-    setIngredientesRemovidos((prev) => {
-      const merged = new Set(prev)
-      indisponiveisHoje.forEach((ing) => merged.add(ing))
-      return Array.from(merged)
-    })
+    // Não adiciona ingredientes indisponíveis ao ingredientesRemovidos
+    // Eles serão tratados separadamente no handleConfirm
 
     setSubstituicoes(
       indisponiveisHoje.reduce((acc, ing) => {
@@ -159,10 +156,12 @@ export default function ProductCustomizationModal({
   }, [extrasSelecionados, indisponiveisHoje, extrasDisponiveis])
 
   const handleConfirm = () => {
-    const removidosSet = new Set<string>([
-      ...ingredientesRemovidos,
-      ...indisponiveisHoje,
-    ])
+    // Apenas ingredientes removidos pelo usuário (não incluir os indisponíveis aqui)
+    // Os indisponíveis serão enviados separadamente no campo ingredientes_indisponiveis
+    const indisponiveisSet = new Set(indisponiveisHoje.map(i => i.toLowerCase()))
+    const removidosSet = new Set<string>(
+      ingredientesRemovidos.filter(ing => !indisponiveisSet.has(ing.toLowerCase()))
+    )
 
     const extrasSelecionadosObjs = extrasSelecionados
       .map((id) => extrasDisponiveis.find((e) => e.id === id))
