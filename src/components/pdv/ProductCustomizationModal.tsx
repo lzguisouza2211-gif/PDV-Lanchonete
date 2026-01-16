@@ -10,6 +10,7 @@ export type ExtraOption = {
 export type CustomizationData = {
   extras: ExtraOption[]
   observacoes: string
+  ingredientes_indisponiveis?: string[]
 }
 
 type ProductCustomizationModalProps = {
@@ -202,6 +203,7 @@ export default function ProductCustomizationModal({
     onConfirm({
       extras: extrasComMarcacao as ExtraOption[],
       observacoes: observacoes.trim(),
+      ingredientes_indisponiveis: indisponiveisHoje,
     })
     
     // Reset

@@ -171,6 +171,20 @@ export default function CartDrawer({
                     </div>
                   ))}
 
+                  {/* INGREDIENTES INDISPONÍVEIS */}
+                  {item.ingredientes_indisponiveis && item.ingredientes_indisponiveis.length > 0 && (
+                    <div>
+                      {item.ingredientes_indisponiveis.map((ing, i) => (
+                        <div
+                          key={i}
+                          style={{ fontSize: 12, color: '#e74c3c' }}
+                        >
+                          – Sem {ing}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* OBSERVAÇÕES */}
                   {item.observacoes && (
                     <div

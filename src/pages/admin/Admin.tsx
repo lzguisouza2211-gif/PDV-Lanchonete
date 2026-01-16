@@ -381,7 +381,7 @@ export default function Admin() {
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            zIndex: 1000,
+            zIndex: 9999,
             animation: 'fadeIn 0.2s ease',
           }}
         >
@@ -516,6 +516,26 @@ export default function Admin() {
                                 - Sem {extra.nome}
                               </div>
                             ))}
+                        </div>
+                      )}
+                      
+                      {/* Ingredientes Indisponíveis */}
+                      {item.ingredientes_indisponiveis && item.ingredientes_indisponiveis.length > 0 && (
+                        <div style={{ marginTop: 6, marginBottom: 4 }}>
+                          {item.ingredientes_indisponiveis.map((ing: string, iIdx: number) => (
+                            <div
+                              key={iIdx}
+                              style={{
+                                fontSize: 12,
+                                color: '#e74c3c',
+                                marginBottom: 2,
+                                paddingLeft: 8,
+                                fontWeight: 600,
+                              }}
+                            >
+                              − Sem {ing}
+                            </div>
+                          ))}
                         </div>
                       )}
                       

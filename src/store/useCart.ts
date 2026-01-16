@@ -7,6 +7,7 @@ export type CartItem = {
   price: number
   qty: number
   observacoes?: string
+  ingredientes_indisponiveis?: string[]
   extras?: ExtraItem[]
 }
 
@@ -21,10 +22,10 @@ export const useCart = create<CartState>((set) => ({
   items: [],
   add: (item) =>
     set((state) => {
-      // Criar ID único baseado no produto + extras + observações para diferenciar itens customizados
-      const itemKey = `${item.id}-${JSON.stringify(item.extras || [])}-${item.observacoes || ''}`
+      // Criar ID único baseado no produto + extras + observações + ingredientes_indisponiveis para diferenciar itens customizados
+      const itemKey = `${item.id}-${JSON.stringify(item.extras || [])}-${item.observacoes || ''}-${JSON.stringify(item.ingredientes_indisponiveis || [])}`
       const existingItem = state.items.find((i) => {
-        const iKey = `${i.id}-${JSON.stringify(i.extras || [])}-${i.observacoes || ''}`
+        const iKey = `${i.id}-${JSON.stringify(i.extras || [])}-${i.observacoes || ''}-${JSON.stringify(i.ingredientes_indisponiveis || [])}`
         return iKey === itemKey
       })
       
@@ -32,7 +33,7 @@ export const useCart = create<CartState>((set) => ({
         // Se item já existe com mesma customização, aumenta a quantidade
         return {
           items: state.items.map((i) => {
-            const iKey = `${i.id}-${JSON.stringify(i.extras || [])}-${i.observacoes || ''}`
+            const iKey = `${i.id}-${JSON.stringify(i.extras || [])}-${i.observacoes || ''}-${JSON.stringify(i.ingredientes_indisponiveis || [])}`
             return iKey === itemKey ? { ...i, qty: i.qty + (item.qty || 1) } : i
           }),
         }

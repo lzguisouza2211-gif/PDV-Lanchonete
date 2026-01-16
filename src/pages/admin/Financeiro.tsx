@@ -75,8 +75,20 @@ export default function Financeiro() {
           end.toISOString()
         )
 
+        // Carregar cardápio para obter categorias
+        const { data: cardapio } = await import('../../services/supabaseClient').then(({ supabase }) =>
+          supabase.from('cardapio').select('id,nome,categoria')
+        )
+        
+        const categoriasMap: Record<string, string> = {}
+        if (cardapio) {
+          cardapio.forEach((p: any) => {
+            categoriasMap[p.nome] = p.categoria || ''
+          })
+        }
+
         // Agrupar itens vendidos
-        const itensMap: Record<string, { nome: string; quantidade: number; valor: number }> = {}
+        const itensMap: Record<string, { nome: string; categoria: string; quantidade: number; valor: number }> = {}
         
         pedidos.forEach((pedido) => {
           if (pedido.itens && Array.isArray(pedido.itens)) {
@@ -84,9 +96,10 @@ export default function Financeiro() {
               const nome = item.nome || item.nome
               const quantidade = item.quantidade || 1
               const preco = item.preco || 0
+              const categoria = categoriasMap[nome] || 'Outros'
               
               if (!itensMap[nome]) {
-                itensMap[nome] = { nome, quantidade: 0, valor: 0 }
+                itensMap[nome] = { nome, categoria, quantidade: 0, valor: 0 }
               }
               itensMap[nome].quantidade += quantidade
               itensMap[nome].valor += preco * quantidade
@@ -94,12 +107,22 @@ export default function Financeiro() {
           }
         })
 
+        // Ordenar: Lanches primeiro, depois por quantidade
+        const categoriasOrder = ['Lanches', 'Bebidas', 'Acompanhamentos', 'Sobremesas', 'Outros']
         const itensArray = Object.values(itensMap)
-          .sort((a, b) => b.quantidade - a.quantidade)
+          .sort((a, b) => {
+            const catOrderA = categoriasOrder.indexOf(a.categoria)
+            const catOrderB = categoriasOrder.indexOf(b.categoria)
+            if (catOrderA !== catOrderB) {
+              return catOrderA - catOrderB
+            }
+            return b.quantidade - a.quantidade
+          })
           .slice(0, 20) // Top 20 itens
 
         setItensVendidos(itensArray)
       } catch (error) {
+        console.error('Erro ao carregar itens:', error)
       }
     }
 

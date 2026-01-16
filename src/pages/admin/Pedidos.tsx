@@ -204,6 +204,38 @@ export default function PedidosAdmin() {
           <p style={{ fontSize: 14 }}>📍 {pedido.endereco}</p>
         )}
 
+        {/* Itens do pedido */}
+        {pedido.itens && Array.isArray(pedido.itens) && pedido.itens.length > 0 && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #eee' }}>
+            <strong style={{ fontSize: 13, display: 'block', marginBottom: 8 }}>📦 Itens:</strong>
+            {pedido.itens.map((item: any, idx: number) => (
+              <div key={idx} style={{ fontSize: 13, marginBottom: 6, lineHeight: 1.5 }}>
+                <div>
+                  {item.quantidade}x <strong>{item.nome}</strong>
+                </div>
+                {item.extras && Array.isArray(item.extras) && item.extras.length > 0 && (
+                  <div style={{ marginLeft: 12, color: '#666', fontSize: 12 }}>
+                    {item.extras.map((extra: any, i: number) => (
+                      <div key={i}>
+                        {extra.tipo === 'add' ? '+' : '−'} {extra.nome}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {item.ingredientes_indisponiveis && Array.isArray(item.ingredientes_indisponiveis) && item.ingredientes_indisponiveis.length > 0 && (
+                  <div style={{ marginLeft: 12, color: '#e74c3c', fontSize: 12, fontWeight: 600 }}>
+                    {item.ingredientes_indisponiveis.map((ing: string, i: number) => (
+                      <div key={i}>
+                        − Sem {ing}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Botões de atualização de status */}
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
           <button

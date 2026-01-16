@@ -4,13 +4,13 @@ import Header from '../../components/admin/Header'
 
 export default function AdminLayout() {
   return (
-    <div style={{ minHeight: '100vh', background: '#f4f5f7', display: 'flex' }}>
+    <div style={{ minHeight: '100vh', background: 'white', display: 'flex' }}>
       <Sidebar />
 
       <div className="admin-content" style={{ display: 'flex', flexDirection: 'column', marginLeft: 250, flex: 1 }}>
         <Header />
 
-        <main style={{ padding: 18, overflowY: 'auto', flex: 1 }}>
+        <main style={{ padding: 18, overflowY: 'auto', flex: 1, background: 'white' }}>
           <Outlet />
         </main>
       </div>
