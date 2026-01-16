@@ -163,6 +163,37 @@ export default function Sidebar() {
           <span style={{ fontSize: 20 }}>💰</span>
           Financeiro
         </NavLink>
+
+        <NavLink
+          to="/admin/gestao-cardapio"
+          style={({ isActive }) => ({
+            padding: '14px 16px',
+            borderRadius: 12,
+            textDecoration: 'none',
+            color: isActive ? '#c0392b' : '#666',
+            fontWeight: isActive ? 700 : 500,
+            background: isActive ? '#fef2f2' : 'transparent',
+            borderLeft: isActive ? '4px solid #c0392b' : '4px solid transparent',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            fontSize: 15,
+            transition: 'all 0.2s ease',
+          })}
+          onMouseEnter={(e) => {
+            if (!e.currentTarget.style.background.includes('fef2f2')) {
+              e.currentTarget.style.background = '#f9fafb'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!e.currentTarget.style.background.includes('fef2f2')) {
+              e.currentTarget.style.background = 'transparent'
+            }
+          }}
+        >
+          <span style={{ fontSize: 20 }}>🍽️</span>
+          Cardápio
+        </NavLink>
       </nav>
 
       {/* SAIR */}
