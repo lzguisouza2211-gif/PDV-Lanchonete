@@ -123,60 +123,6 @@ class CardapioService {
       throw error
     }
   }
-
-  async listarIngredientesIndisponiveisHoje(): Promise<Record<string, string[]>> {
-    const hoje = new Date().toISOString().split('T')[0]
-
-    const { data, error } = await supabase
-      .from('ingredientes_indisponiveis_dia')
-      .select('cardapio_id, ingrediente')
-      .eq('valid_on', hoje)
-
-    if (error) {
-      throw error
-    }
-
-    const mapa: Record<string, string[]> = {}
-    ;(data || []).forEach((row: any) => {
-      const key = String(row.cardapio_id)
-      if (!mapa[key]) mapa[key] = []
-      mapa[key].push(row.ingrediente)
-    })
-
-    return mapa
-  }
-
-  async definirIngredienteIndisponivel(
-    cardapioId: string,
-    ingrediente: string,
-    indisponivel: boolean,
-  ): Promise<void> {
-    const hoje = new Date().toISOString().split('T')[0]
-
-    if (indisponivel) {
-      const { error } = await supabase
-        .from('ingredientes_indisponiveis_dia')
-        .upsert(
-          [{ cardapio_id: Number(cardapioId), ingrediente, valid_on: hoje }],
-          { onConflict: 'cardapio_id,ingrediente,valid_on' }
-        )
-
-      if (error) {
-        throw error
-      }
-    } else {
-      const { error } = await supabase
-        .from('ingredientes_indisponiveis_dia')
-        .delete()
-        .eq('cardapio_id', cardapioId)
-        .eq('ingrediente', ingrediente)
-        .eq('valid_on', hoje)
-
-      if (error) {
-        throw error
-      }
-    }
-  }
 }
 
 export const cardapioService = new CardapioService()

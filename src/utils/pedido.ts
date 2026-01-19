@@ -44,15 +44,6 @@ export function normalizePedidoPayload(
     throw new Error('Nome do cliente é obrigatório')
   }
 
-  if (!input.telefone?.trim()) {
-    throw new Error('Telefone é obrigatório para notificações WhatsApp')
-  }
-
-  const telefone = input.telefone.replace(/\D/g, '')
-  if (telefone.length < 10 || telefone.length > 11) {
-    throw new Error('Telefone inválido. Use formato: (11) 98765-4321')
-  }
-
   if (items.length === 0) {
     throw new Error('Carrinho vazio')
   }

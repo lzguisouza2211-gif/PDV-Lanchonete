@@ -6,7 +6,7 @@ type CartDrawerProps = {
   onClose: () => void
   items: CartItem[]
   total: number
-  onRemove: (id: string) => void
+  onRemove: (cartKey: string) => void
   onAdd: (item: CartItem) => void
   children: React.ReactNode
 }
@@ -127,7 +127,7 @@ export default function CartDrawer({
 
               return (
                 <div
-                  key={`${item.id}-${index}`}
+                  key={item.cartKey || `${item.id}-${index}`}
                   style={{
                     paddingBottom: 16,
                     marginBottom: 16,
@@ -161,9 +161,10 @@ export default function CartDrawer({
                   {extrasAdd.map((e, i) => (
                     <div
                       key={i}
-                      style={{ fontSize: 12, color: '#27ae60' }}
+                      style={{ fontSize: 12, color: '#27ae60', display: 'flex', justifyContent: 'space-between' }}
                     >
-                      + {e.nome}
+                      <span>+ {e.nome}</span>
+                      <span>+R$ {e.preco.toFixed(2)}</span>
                     </div>
                   ))}
                   {extrasRemove.map((e, i) => (
@@ -219,7 +220,7 @@ export default function CartDrawer({
                         Qtd: {item.qty}
                       </span>
                       <button
-                        onClick={() => onRemove(item.id)}
+                        onClick={() => onRemove(item.cartKey!)}
                         style={{
                           padding: '8px 16px',
                           borderRadius: 8,
@@ -246,7 +247,7 @@ export default function CartDrawer({
                       }}
                     >
                       <button
-                        onClick={() => onRemove(item.id)}
+                        onClick={() => onRemove(item.cartKey!)}
                         style={{
                           width: 36,
                           height: 36,

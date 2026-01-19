@@ -462,7 +462,9 @@ export default function Admin() {
                   const precoExtras = (item.extras || []).reduce((sum: number, extra: any) => {
                     return sum + (extra.tipo === 'add' ? extra.preco : 0)
                   }, 0)
-                  const precoTotal = precoBase + precoExtras
+                  const precoUnitario = precoBase + precoExtras
+                  const quantidade = item.quantidade || 1
+                  const precoTotal = precoUnitario * quantidade
                   
                   return (
                     <div
@@ -475,13 +477,27 @@ export default function Admin() {
                             : 'none',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                        <span style={{ fontWeight: 600, fontSize: 15 }}>{item.nome}</span>
-                        <span style={{ color: '#666', fontWeight: 600 }}>
-                          R$ {precoTotal.toFixed(2)}
-                          {item.quantidade && item.quantidade > 1
-                            ? ` x${item.quantidade}`
-                            : ''}
+                      {/* Nome do item com preço base */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {quantidade > 1 && (
+                            <span style={{ 
+                              fontSize: 14, 
+                              fontWeight: 700, 
+                              color: '#fff',
+                              background: '#3498db',
+                              padding: '2px 8px',
+                              borderRadius: 6,
+                              minWidth: 28,
+                              textAlign: 'center'
+                            }}>
+                              {quantidade}x
+                            </span>
+                          )}
+                          <span style={{ fontWeight: 600, fontSize: 15, color: '#1a1a1a' }}>{item.nome}</span>
+                        </div>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#666' }}>
+                          R$ {precoBase.toFixed(2)}
                         </span>
                       </div>
                       
@@ -494,13 +510,16 @@ export default function Admin() {
                               <div
                                 key={eIdx}
                                 style={{
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: '#27ae60',
                                   marginBottom: 2,
                                   paddingLeft: 8,
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
                                 }}
                               >
-                                + {extra.nome} (+R$ {extra.preco.toFixed(2)})
+                                <span>+ {extra.nome}</span>
+                                <span style={{ fontWeight: 600 }}>R$ {extra.preco.toFixed(2)}</span>
                               </div>
                             ))}
                           {item.extras
@@ -509,7 +528,7 @@ export default function Admin() {
                               <div
                                 key={eIdx}
                                 style={{
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: '#e74c3c',
                                   marginBottom: 2,
                                   paddingLeft: 8,
@@ -528,7 +547,7 @@ export default function Admin() {
                             <div
                               key={iIdx}
                               style={{
-                                fontSize: 12,
+                                fontSize: 13,
                                 color: '#e74c3c',
                                 marginBottom: 2,
                                 paddingLeft: 8,
@@ -540,16 +559,16 @@ export default function Admin() {
                           ))}
                         </div>
                       )}
-                      
+
                       {/* Observações */}
                       {item.observacoes && (
                         <div
                           style={{
-                            fontSize: 12,
+                            fontSize: 13,
                             color: '#666',
                             fontStyle: 'italic',
-                            marginTop: 4,
-                            padding: 6,
+                            marginTop: 6,
+                            padding: 8,
                             background: '#fff',
                             borderRadius: 6,
                             border: '1px solid #e0e0e0',
@@ -599,86 +618,43 @@ export default function Admin() {
               )}
             </div>
             
-            {/* Informações Financeiras */}
-            <div
-              style={{
-                background: '#f0f9ff',
-                borderRadius: 12,
-                padding: 16,
-                marginBottom: 24,
-                border: '1px solid #bae6fd',
-              }}
-            >
-              <h3
-                style={{
-                  margin: '0 0 12px 0',
-                  fontSize: 16,
-                  fontWeight: 600,
-                  color: '#1a1a1a',
-                }}
-              >
-                💰 Informações Financeiras
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 14, color: '#666' }}>Subtotal:</span>
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>
-                    R$ {pedidoSelecionado.total.toFixed(2)}
-                  </span>
-                </div>
-                {pedidoSelecionado.troco && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 14, color: '#666' }}>Troco:</span>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#27ae60' }}>
-                      R$ {Number(pedidoSelecionado.troco).toFixed(2)}
-                    </span>
-                  </div>
-                )}
-                <div
-                  style={{
-                    marginTop: 8,
-                    paddingTop: 8,
-                    borderTop: '1px solid #bae6fd',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a' }}>
-                    Total a receber:
-                  </span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: '#c0392b' }}>
-                    R$ {pedidoSelecionado.total.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
+            {/* Total do Pedido */}
             <div
               style={{
                 padding: 20,
-                background: '#f9fafb',
+                background: '#f0f9ff',
                 borderRadius: 12,
-                textAlign: 'center',
+                border: '2px solid #3498db',
+                marginBottom: 16,
               }}
             >
-              <div
-                style={{
-                  fontSize: 14,
-                  color: '#666',
-                  marginBottom: 8,
-                }}
-              >
-                Total
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 18, fontWeight: 600, color: '#1a1a1a' }}>
+                  💰 Total do Pedido
+                </span>
+                <span style={{ fontSize: 28, fontWeight: 700, color: '#c0392b' }}>
+                  R$ {pedidoSelecionado.total.toFixed(2)}
+                </span>
               </div>
-              <div
-                style={{
-                  fontSize: 32,
-                  fontWeight: 700,
-                  color: '#c0392b',
-                }}
-              >
-                R$ {pedidoSelecionado.total.toFixed(2)}
-              </div>
+              {pedidoSelecionado.troco && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    paddingTop: 12,
+                    borderTop: '1px solid #bae6fd',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <span style={{ fontSize: 14, color: '#666' }}>
+                    💵 Troco para
+                  </span>
+                  <span style={{ fontSize: 16, fontWeight: 600, color: '#27ae60' }}>
+                    R$ {Number(pedidoSelecionado.troco).toFixed(2)}
+                  </span>
+                </div>
+              )}
             </div>
 
             <button
