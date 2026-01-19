@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { Pedido } from '../../services/api/pedidos.service'
 import usePedidos from '../../hooks/usePedidos'
 import { supabase } from '../../services/supabaseClient'
+import PrintButtons from '../../components/admin/PrintButtons'
+import { printQueue } from '../../services/printer/printQueue'
+import { elginPrinter } from '../../services/printer/elginPrinter'
 
 const COLUMNS = [
   { id: 'Recebido', title: 'Recebido', color: '#fff3cd', icon: '📥' },
@@ -38,12 +41,42 @@ export default function Admin() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'pedidos' },
         (payload) => {
+          console.log('🔔 REALTIME: Novo pedido detectado!', payload)
           const novo = payload.new as Pedido
 
           setPedidos((prev) => {
             if (prev.some((p) => p.id === novo.id)) return prev
             return [novo, ...prev]
           })
+
+          // 🖨️ IMPRESSÃO AUTOMÁTICA
+          console.log('🖨️ Novo pedido recebido! Iniciando impressão automática...', novo.id)
+          
+          // Imprimir notinha de produção
+          try {
+            const contentProducao = elginPrinter.generateProducao(novo)
+            printQueue.addJob('producao', {
+              pedidoId: novo.id,
+              content: contentProducao,
+            })
+            console.log(`✅ Notinha de produção do pedido #${novo.id} adicionada à fila`)
+          } catch (error) {
+            console.error('❌ Erro ao adicionar notinha de produção:', error)
+          }
+
+          // Imprimir notinha de motoboy (se for entrega)
+          if (novo.tipoentrega === 'entrega') {
+            try {
+              const contentMotoboy = elginPrinter.generateMotoboy(novo)
+              printQueue.addJob('motoboy', {
+                pedidoId: novo.id,
+                content: contentMotoboy,
+              })
+              console.log(`✅ Notinha de motoboy do pedido #${novo.id} adicionada à fila`)
+            } catch (error) {
+              console.error('❌ Erro ao adicionar notinha de motoboy:', error)
+            }
+          }
         }
       )
 
@@ -66,6 +99,40 @@ export default function Admin() {
     return () => {
       supabase.removeChannel(channel)
     }
+  }, [])
+
+  /* =======================
+     INICIALIZAR IMPRESSORA
+  ======================= */
+  useEffect(() => {
+    // Registra callback para a fila de impressão
+    printQueue.registerPrintCallback(async (job) => {
+      let printReady = false
+      try {
+        printQueue.setPrinterReady(false)
+        printReady = true
+
+        // Extrai o conteúdo do job
+        const content = job.data.content || ''
+
+        // Tenta imprimir (API ou fallback para navegador)
+        const printed = await elginPrinter.print(content)
+
+        // Mesmo que use fallback, consideramos como sucesso
+        if (!printed) {
+          console.warn('⚠️  Impressão via fallback do navegador')
+        } else {
+          console.log('✅ Impressão bem-sucedida')
+        }
+      } catch (error) {
+        console.error('❌ Erro crítico durante impressão:', error)
+      } finally {
+        // SEMPRE retorna a impressora como pronta
+        if (printReady) {
+          printQueue.setPrinterReady(true)
+        }
+      }
+    })
   }, [])
 
   /* =======================
@@ -331,36 +398,54 @@ export default function Admin() {
 
                       {/* Botão para avançar status */}
                       {!bloqueado && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            avancarStatus(pedido)
-                          }}
-                          style={{
-                            width: '100%',
-                            marginTop: 12,
-                            padding: '10px 16px',
-                            background: col.id === 'Recebido' ? '#3498db' : '#27ae60',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: 8,
-                            fontSize: 14,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-2px)'
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)'
-                            e.currentTarget.style.boxShadow = 'none'
-                          }}
-                        >
-                          {col.id === 'Recebido' ? '👨‍🍳 Iniciar preparo' : '✅ Finalizar'}
-                        </button>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              avancarStatus(pedido)
+                            }}
+                            style={{
+                              flex: 1,
+                              marginTop: 12,
+                              padding: '10px 16px',
+                              background: col.id === 'Recebido' ? '#3498db' : '#27ae60',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 8,
+                              fontSize: 14,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)'
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)'
+                              e.currentTarget.style.boxShadow = 'none'
+                            }}
+                          >
+                            {col.id === 'Recebido' ? '👨‍🍳 Iniciar preparo' : '✅ Finalizar'}
+                          </button>
+                        </div>
                       )}
+
+                      {/* Botão de impressão */}
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ marginTop: 8 }}
+                      >
+                        <PrintButtons
+                          pedido={pedido}
+                          showMotoboy={true}
+                          onPrintSuccess={() => {
+                            console.log(
+                              `✅ Impressão do pedido #${pedido.id} enviada`
+                            )
+                          }}
+                        />
+                      </div>
                     </div>
                   )
                 })
