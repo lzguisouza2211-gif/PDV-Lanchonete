@@ -64,16 +64,22 @@ export const pedidosService = {
     return true
   },
 
-  async updateStatus(id: number, status: string): Promise<boolean> {
-    const { error } = await supabase
+  async updateStatus(id: number, status: string): Promise<Pedido> {
+    const { data, error } = await supabase
       .from('pedidos')
       .update({ status })
       .eq('id', id)
+      .select()
+      .single()
 
     if (error) {
-      return false
+      throw new Error(error.message || 'Erro ao atualizar status do pedido')
     }
 
-    return true
+    if (!data) {
+      throw new Error('Atualização de status não retornou dados')
+    }
+
+    return data as Pedido
   },
 }

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../services/supabaseClient'
 import { cardapioService } from '../services/api/cardapio.service'
+import { logger } from '../services/logger/logger'
 
 /**
  * Hook que mantém sincronizado a lista de ingredientes indisponíveis
@@ -11,15 +12,21 @@ export function useIngredientesIndisponiveisRealtime(
   onUpdate: (mapa: Record<string, string[]>) => void
 ) {
   const [isRealtime, setIsRealtime] = useState(false)
+  const onUpdateRef = useRef(onUpdate)
+
+  // Mantém a referência atualizada sem causar re-render
+  useEffect(() => {
+    onUpdateRef.current = onUpdate
+  }, [onUpdate])
 
   useEffect(() => {
     // Carrega inicial
     const loadInitial = async () => {
       try {
         const mapa = await cardapioService.listarIngredientesIndisponiveisHoje()
-        onUpdate(mapa)
+        onUpdateRef.current(mapa)
       } catch (err) {
-        console.error('Erro ao carregar ingredientes indisponíveis:', err)
+        logger.error('Erro ao carregar ingredientes indisponíveis:', err)
       }
     }
 
@@ -37,7 +44,7 @@ export function useIngredientesIndisponiveisRealtime(
           table: 'ingredientes_indisponiveis_dia',
         },
         async (payload) => {
-          console.log('📡 Realtime ativado! Evento recebido:', payload)
+          logger.info('📡 Realtime ativado! Evento recebido:', payload)
           realtimeWorking = true
           setIsRealtime(true)
 
@@ -47,9 +54,9 @@ export function useIngredientesIndisponiveisRealtime(
           if (row && String(row.valid_on).split('T')[0] === hoje) {
             try {
               const mapa = await cardapioService.listarIngredientesIndisponiveisHoje()
-              onUpdate(mapa)
+              onUpdateRef.current(mapa)
             } catch (err) {
-              console.error('Erro ao atualizar realtime:', err)
+              logger.error('Erro ao atualizar realtime:', err)
             }
           }
         }
@@ -62,16 +69,16 @@ export function useIngredientesIndisponiveisRealtime(
 
       try {
         const mapa = await cardapioService.listarIngredientesIndisponiveisHoje()
-        onUpdate(mapa)
+        onUpdateRef.current(mapa)
       } catch (err) {
-        console.error('Erro no polling de ingredientes:', err)
+        logger.error('Erro no polling de ingredientes:', err)
       }
     }, 5000)
 
     // Após 10 segundos sem evento realtime, ativa polling
     const realtimeTimeout = setTimeout(() => {
       if (!realtimeWorking) {
-        console.warn(
+        logger.warn(
           '⏱️ Realtime não respondeu em 10s. Usando polling como fallback.'
         )
         setIsRealtime(false)
@@ -83,7 +90,7 @@ export function useIngredientesIndisponiveisRealtime(
       clearTimeout(realtimeTimeout)
       supabase.removeChannel(channel)
     }
-  }, [onUpdate])
+  }, [])
 
   return { isRealtime }
 }

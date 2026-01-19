@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import InputMask from 'react-input-mask'
 import { useCardapio } from '../../hooks/useCardapio'
 import { useCartWithPedidos } from '../../store/useCartWithPedidos'
 import { useStoreStatus } from '../../hooks/useStoreStatus'
@@ -16,6 +17,7 @@ import PixKeyDisplay from '../../components/pdv/PixKeyDisplay'
 import { PIX_CONFIG } from '../../config/pix'
 import { useIngredientesIndisponiveisRealtime } from '../../hooks/useIngredientesIndisponiveisRealtime'
 import { useProdutosDisponibilidadeRealtime } from '../../hooks/useProdutosDisponibilidadeRealtime'
+import { validarTelefoneBrasileiro } from '../../utils/validation'
 
 export default function Cardapio(): JSX.Element {
   const { itens: itensCardapio, loading, error, recarregar } = useCardapio()
@@ -24,6 +26,7 @@ export default function Cardapio(): JSX.Element {
   const { isOpen: lojaAberta, loading: statusLoading } = useStoreStatus()
 
   const [nome, setNome] = useState('')
+    const [telefone, setTelefone] = useState('')
   const [tipoEntrega, setTipoEntrega] =
     useState<'retirada' | 'entrega' | 'local'>('retirada')
   const [endereco, setEndereco] = useState('')
@@ -101,11 +104,21 @@ export default function Cardapio(): JSX.Element {
         const mapa = await cardapioService.listarIngredientesIndisponiveisHoje()
         setIngredientesIndisponiveisHoje(mapa)
       } catch (err) {
-        console.error('Erro ao carregar ingredientes indisponíveis para hoje:', err)
+        logger.error('Erro ao carregar ingredientes indisponíveis para hoje:', err)
       }
     }
 
     carregarIndisponiveis()
+  }, [])
+
+  // Memoiza callbacks para evitar re-subscriptions nos hooks de realtime
+  const handleIngredientesUpdate = useCallback((mapa: Record<string, string[]>) => {
+    setIngredientesIndisponiveisHoje(mapa)
+  }, [])
+
+  const handleProdutosUpdate = useCallback((itensAtualizados: any[]) => {
+    setItens(itensAtualizados)
+    logger.info('📡 Cardápio atualizado em tempo real:', itensAtualizados.length, 'itens')
   }, [])
 
   // Callbacks memoizadas para evitar re-execução infinita dos hooks realtime
@@ -148,7 +161,7 @@ export default function Cardapio(): JSX.Element {
     }
 
     // Debug: mostrar categoria, extras e ingredientes
-    console.log('[DEBUG] Produto:', produto.nome, '| Categoria:', produto.categoria)
+logger.info('[DEBUG] Produto:', produto.nome, '| Categoria:', produto.categoria)
 
     if (CATEGORIAS_CUSTOMIZAVEIS.includes(produto.categoria)) {
       const addons = await productAddonsService.getByProduct(produto.id)
@@ -163,8 +176,8 @@ export default function Cardapio(): JSX.Element {
       const temExtras = extras.length > 0
       const temRemoviveis = Array.isArray(produto.ingredientes) && produto.ingredientes.length > 0
 
-      console.log('[DEBUG] Extras:', extras)
-      console.log('[DEBUG] Ingredientes removíveis:', produto.ingredientes)
+      logger.info('[DEBUG] Extras:', extras)
+      logger.info('[DEBUG] Ingredientes removíveis:', produto.ingredientes)
 
       setExtrasDisponiveis(extras)
       setProdutoSelecionado(produto)
@@ -240,10 +253,20 @@ export default function Cardapio(): JSX.Element {
     enviandoRef.current = true
     setEnviando(true)
     setErro(null)
+      // Validações
+      if (!nome.trim()) {
+        throw new Error('Nome é obrigatório')
+      }
+      
+      if (!validarTelefoneBrasileiro(telefone)) {
+        throw new Error('Telefone inválido. Use o formato: (XX) XXXXX-XXXX')
+      }
+
 
     try {
       await criarPedido({
         cliente: nome,
+          telefone,
         tipoEntrega,
         endereco: tipoEntrega === 'entrega' ? endereco : undefined,
         formaPagamento,
@@ -254,6 +277,7 @@ export default function Cardapio(): JSX.Element {
       setCarrinhoAberto(false)
       setSucesso(true)
       setNome('')
+      setTelefone('')
       setEndereco('')
       setTroco('')
     } catch (e: any) {
@@ -425,7 +449,7 @@ export default function Cardapio(): JSX.Element {
             disabled={enviando}
             style={{
               width: '100%',
-              boxSizing: 'border-box', // 👈 ESSENCIAL
+              boxSizing: 'border-box',
               marginBottom: 12,
               padding: 14,
               fontSize: 16,
@@ -434,6 +458,30 @@ export default function Cardapio(): JSX.Element {
               background: '#fff',
             }}
           />
+
+          <InputMask
+            mask="(99) 99999-9999"
+            placeholder="Telefone *"
+            value={telefone}
+            onChange={(e) => setTelefone(e.target.value)}
+            disabled={enviando}
+          >
+            {(inputProps: any) => (
+              <input
+                {...inputProps}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  marginBottom: 12,
+                  padding: 14,
+                  fontSize: 16,
+                  borderRadius: 10,
+                  border: '1px solid #ddd',
+                  background: '#fff',
+                }}
+              />
+            )}
+          </InputMask>
 
           <select
             value={tipoEntrega}
@@ -547,14 +595,14 @@ export default function Cardapio(): JSX.Element {
 
           <button
             onClick={finalizar}
-            disabled={enviando || !nome.trim() || items.length === 0}
+            disabled={enviando || !nome.trim() || !telefone.trim() || telefone.length < 10 || items.length === 0}
             style={{
               width: '100%',
               padding: 16,
               borderRadius: 10,
               border: 'none',
               background:
-                enviando || !nome.trim() || items.length === 0
+                enviando || !nome.trim() || !telefone.trim() || telefone.length < 10 || items.length === 0
                   ? '#95a5a6'
                   : '#27ae60',
               color: '#fff',

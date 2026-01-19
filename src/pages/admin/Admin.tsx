@@ -1,17 +1,10 @@
 import { useEffect, useState } from 'react'
-import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-} from '@hello-pangea/dnd'
-
 import { Pedido } from '../../services/api/pedidos.service'
 import usePedidos from '../../hooks/usePedidos'
 import { supabase } from '../../services/supabaseClient'
 
 const COLUMNS = [
   { id: 'Recebido', title: 'Recebido', color: '#fff3cd', icon: '📥' },
-  { id: 'confirmação', title: 'Confirmação', color: '#d1ecf1', icon: '✅' },
   { id: 'Em preparo', title: 'Em preparo', color: '#cfe2ff', icon: '👨‍🍳' },
   { id: 'Finalizado', title: 'Finalizado', color: '#d1e7dd', icon: '🎉' },
 ]
@@ -76,30 +69,42 @@ export default function Admin() {
   }, [])
 
   /* =======================
-     DRAG END
+     AVANÇAR STATUS
   ======================= */
-  const onDragEnd = async (result: any) => {
-    const { destination, source, draggableId } = result
-    if (!destination) return
+  const avancarStatus = async (pedido: Pedido) => {
+    const statusAtual = pedido.status ?? 'Recebido'
+    
+    let proximoStatus: string
+    if (statusAtual === 'Recebido') {
+      proximoStatus = 'Em preparo'
+    } else if (statusAtual === 'Em preparo') {
+      proximoStatus = 'Finalizado'
+    } else {
+      return // Já finalizado
+    }
 
-    const origem = source.droppableId
-    const destino = destination.droppableId
-
-    // regras
-    if (origem === 'Finalizado') return
-    if (origem === 'Recebido' && destino === 'Finalizado') return
-    if (origem === 'confirmação' && destino === 'Recebido') return
-
-    const pedidoId = Number(draggableId)
+    const previousPedidos = pedidos
 
     // UI otimista
     setPedidos((prev) =>
       prev.map((p) =>
-        p.id === pedidoId ? { ...p, status: destino } : p
+        p.id === pedido.id ? { ...p, status: proximoStatus } : p
       )
     )
 
-    await atualizarStatus(pedidoId, destino)
+    try {
+      const atualizado = await atualizarStatus(pedido.id, proximoStatus)
+
+      setPedidos((prev) =>
+        prev.map((p) => (p.id === pedido.id ? atualizado : p))
+      )
+    } catch (err: any) {
+      console.error('Erro ao atualizar status do pedido', err)
+      setPedidos(previousPedidos)
+
+      const mensagemErro = err?.message || 'Erro ao atualizar status do pedido.'
+      alert(`${mensagemErro}\nVerifique se está logado como admin.`)
+    }
   }
 
   if (loading)
@@ -130,243 +135,240 @@ export default function Admin() {
         📋 Painel de Pedidos
       </h1>
 
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, minmax(220px, 1fr))',
-            gap: 16,
-          }}
-          className="kanban-grid"
-        >
-          {COLUMNS.map((col) => {
-            let pedidosColuna = pedidos.filter(
-              (p) => (p.status ?? 'Recebido') === col.id
-            )
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, minmax(280px, 1fr))',
+          gap: 16,
+        }}
+        className="kanban-grid"
+      >
+        {COLUMNS.map((col) => {
+          let pedidosColuna = pedidos.filter(
+            (p) => (p.status ?? 'Recebido') === col.id
+          )
 
-            // 🔒 Finalizados: só hoje + limite visual
-            if (col.id === 'Finalizado') {
-              pedidosColuna = pedidosColuna
-                .filter((p: any) =>
-                  p.created_at?.startsWith(hoje)
-                )
-                .slice(0, 20)
-            }
+          // 🔒 Finalizados: só hoje + limite visual
+          if (col.id === 'Finalizado') {
+            pedidosColuna = pedidosColuna
+              .filter((p: any) =>
+                p.created_at?.startsWith(hoje)
+              )
+              .slice(0, 20)
+          }
 
-            return (
-              <Droppable droppableId={col.id} key={col.id}>
-                {(provided) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    style={{
-                      background: '#fff',
-                      borderRadius: 16,
-                      padding: 20,
-                      minHeight: 500,
-                      boxShadow: '0 4px 12px rgba(0,0,0,.1)',
-                      borderTop: `4px solid ${col.color}`,
-                    }}
-                  >
+          return (
+            <div
+              key={col.id}
+              style={{
+                background: '#fff',
+                borderRadius: 16,
+                padding: 20,
+                minHeight: 500,
+                boxShadow: '0 4px 12px rgba(0,0,0,.1)',
+                borderTop: `4px solid ${col.color}`,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: '2px solid #f3f4f6',
+                }}
+              >
+                <span style={{ fontSize: 20 }}>{col.icon}</span>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: '#1a1a1a',
+                  }}
+                >
+                  {col.title}
+                </h3>
+                <span
+                  style={{
+                    marginLeft: 'auto',
+                    background: col.color,
+                    color: '#1a1a1a',
+                    padding: '4px 12px',
+                    borderRadius: 12,
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  {pedidosColuna.length}
+                </span>
+              </div>
+
+              {pedidosColuna.length === 0 ? (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: '40px 20px',
+                    color: '#999',
+                    fontSize: 14,
+                  }}
+                >
+                  Nenhum pedido
+                </div>
+              ) : (
+                pedidosColuna.map((pedido) => {
+                  const bloqueado = pedido.status === 'Finalizado'
+                  const hora = (pedido as any).created_at
+                    ? new Date(
+                        (pedido as any).created_at
+                      ).toLocaleTimeString('pt-BR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : '--:--'
+
+                  return (
                     <div
+                      key={pedido.id}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        marginBottom: 16,
-                        paddingBottom: 12,
-                        borderBottom: '2px solid #f3f4f6',
+                        background: '#f9fafb',
+                        borderRadius: 12,
+                        padding: 16,
+                        marginBottom: 12,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                        opacity: bloqueado ? 0.7 : 1,
+                        border: '1px solid #e5e7eb',
+                        transition: 'all 0.2s ease',
                       }}
                     >
-                      <span style={{ fontSize: 20 }}>{col.icon}</span>
-                      <h3
-                        style={{
-                          margin: 0,
-                          fontSize: 18,
-                          fontWeight: 600,
-                          color: '#1a1a1a',
-                        }}
-                      >
-                        {col.title}
-                      </h3>
-                      <span
-                        style={{
-                          marginLeft: 'auto',
-                          background: col.color,
-                          color: '#1a1a1a',
-                          padding: '4px 12px',
-                          borderRadius: 12,
-                          fontSize: 12,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {pedidosColuna.length}
-                      </span>
-                    </div>
-
-                    {pedidosColuna.length === 0 ? (
                       <div
-                        style={{
-                          textAlign: 'center',
-                          padding: '40px 20px',
-                          color: '#999',
-                          fontSize: 14,
-                        }}
+                        onClick={() => setPedidoSelecionado(pedido)}
+                        style={{ cursor: 'pointer' }}
                       >
-                        Nenhum pedido
-                      </div>
-                    ) : (
-                      pedidosColuna.map((pedido, index) => {
-                        const bloqueado = pedido.status === 'Finalizado'
-                        const hora = (pedido as any).created_at
-                          ? new Date(
-                              (pedido as any).created_at
-                            ).toLocaleTimeString('pt-BR', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : '--:--'
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: 16,
+                            marginBottom: 8,
+                            color: '#1a1a1a',
+                          }}
+                        >
+                          {pedido.cliente}
+                        </div>
 
-                        return (
-                          <Draggable
-                            key={pedido.id}
-                            draggableId={String(pedido.id)}
-                            index={index}
-                            isDragDisabled={bloqueado}
-                          >
-                            {(provided) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                onClick={() => setPedidoSelecionado(pedido)}
-                                style={{
-                                  background: '#f9fafb',
-                                  borderRadius: 12,
-                                  padding: 16,
-                                  marginBottom: 12,
-                                  cursor: bloqueado ? 'default' : 'pointer',
-                                  boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-                                  opacity: bloqueado ? 0.7 : 1,
-                                  border: '1px solid #e5e7eb',
-                                  transition: 'all 0.2s ease',
-                                  ...provided.draggableProps.style,
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!bloqueado) {
-                                    e.currentTarget.style.background = '#fff'
-                                    e.currentTarget.style.boxShadow =
-                                      '0 4px 12px rgba(0,0,0,0.12)'
-                                    e.currentTarget.style.transform =
-                                      'translateY(-2px)'
-                                  }
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!bloqueado) {
-                                    e.currentTarget.style.background = '#f9fafb'
-                                    e.currentTarget.style.boxShadow =
-                                      '0 2px 6px rgba(0,0,0,0.08)'
-                                    e.currentTarget.style.transform =
-                                      'translateY(0)'
-                                  }
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontWeight: 600,
-                                    fontSize: 16,
-                                    marginBottom: 8,
-                                    color: '#1a1a1a',
-                                  }}
-                                >
-                                  {pedido.cliente}
-                                </div>
-
-                                <div
-                                  style={{
-                                    fontSize: 13,
-                                    color: '#666',
-                                    marginBottom: 8,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 4,
-                                  }}
-                                >
-                                  <div>
-                                    📦 {pedido.tipoentrega ?? 'retirada'}
-                                  </div>
-                                  <div>
-                                    💳 {pedido.formapagamento ?? '-'}
-                                  </div>
-                                  {pedido.troco && (
-                                    <div style={{ fontSize: 12, color: '#27ae60' }}>
-                                      💵 Troco: R$ {Number(pedido.troco).toFixed(2)}
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                {/* Itens com extras/observações */}
-                                {pedido.itens && pedido.itens.length > 0 && (
-                                  <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
-                                    {pedido.itens.some((item: any) => 
-                                      (item.extras && item.extras.length > 0) || item.observacoes
-                                    ) && (
-                                      <div style={{ marginTop: 4 }}>
-                                        ✨ Personalizado
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-
-                                <div
-                                  style={{
-                                    marginTop: 12,
-                                    paddingTop: 12,
-                                    borderTop: '1px solid #e5e7eb',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                  }}
-                                >
-                                  <div>
-                                    <strong
-                                      style={{
-                                        fontSize: 18,
-                                        color: '#c0392b',
-                                        fontWeight: 700,
-                                      }}
-                                    >
-                                      R$ {pedido.total.toFixed(2)}
-                                    </strong>
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: 11,
-                                      color: '#999',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      alignItems: 'flex-end',
-                                    }}
-                                  >
-                                    <span>🕒 {hora}</span>
-                                    <span>#{pedido.id}</span>
-                                  </div>
-                                </div>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            color: '#666',
+                            marginBottom: 8,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 4,
+                          }}
+                        >
+                          <div>
+                            📦 {pedido.tipoentrega ?? 'retirada'}
+                          </div>
+                          <div>
+                            💳 {pedido.formapagamento ?? '-'}
+                          </div>
+                          {pedido.troco && (
+                            <div style={{ fontSize: 12, color: '#27ae60' }}>
+                              💵 Troco: R$ {Number(pedido.troco).toFixed(2)}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Itens com extras/observações */}
+                        {pedido.itens && pedido.itens.length > 0 && (
+                          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+                            {pedido.itens.some((item: any) => 
+                              (item.extras && item.extras.length > 0) || item.observacoes
+                            ) && (
+                              <div style={{ marginTop: 4 }}>
+                                ✨ Personalizado
                               </div>
                             )}
-                          </Draggable>
-                        )
-                      })
-                    )}
+                          </div>
+                        )}
 
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            )
-          })}
-        </div>
-      </DragDropContext>
+                        <div
+                          style={{
+                            marginTop: 12,
+                            paddingTop: 12,
+                            borderTop: '1px solid #e5e7eb',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <div>
+                            <strong
+                              style={{
+                                fontSize: 18,
+                                color: '#c0392b',
+                                fontWeight: 700,
+                              }}
+                            >
+                              R$ {pedido.total.toFixed(2)}
+                            </strong>
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: '#999',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'flex-end',
+                            }}
+                          >
+                            <span>🕒 {hora}</span>
+                            <span>#{pedido.id}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Botão para avançar status */}
+                      {!bloqueado && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            avancarStatus(pedido)
+                          }}
+                          style={{
+                            width: '100%',
+                            marginTop: 12,
+                            padding: '10px 16px',
+                            background: col.id === 'Recebido' ? '#3498db' : '#27ae60',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 8,
+                            fontSize: 14,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)'
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)'
+                            e.currentTarget.style.boxShadow = 'none'
+                          }}
+                        >
+                          {col.id === 'Recebido' ? '👨‍🍳 Iniciar preparo' : '✅ Finalizar'}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          )
+        })}
+      </div>
 
       {/* =======================
           MODAL DETALHES

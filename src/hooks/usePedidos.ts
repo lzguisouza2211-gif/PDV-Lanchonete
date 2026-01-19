@@ -103,14 +103,16 @@ export default function usePedidos() {
   )
 
   const atualizarStatus = useCallback(
-    async (id: number, status: string) => {
+    async (id: number, status: string): Promise<Pedido> => {
       setLoading(true)
       setError(null)
       try {
         return await pedidosService.updateStatus(id, status)
       } catch (e: any) {
+        // Logamos para inspecionar rapidamente no console
+        console.error('Erro Supabase ao atualizar status', e)
         setError(e)
-        return false
+        throw e
       } finally {
         setLoading(false)
       }

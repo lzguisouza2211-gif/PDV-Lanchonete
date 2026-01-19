@@ -1,7 +1,9 @@
 import { CartItem } from '../store/useCart'
+import { limparTelefone, validarTelefoneBrasileiro } from './validation'
 
 export type PedidoPayload = {
   cliente: string
+  telefone: string
   tipoentrega: string | null
   endereco: string | null
   formapagamento: string | null
@@ -29,6 +31,7 @@ export type PedidoPayload = {
 export function normalizePedidoPayload(
   input: {
     cliente: string
+    telefone: string
     tipoEntrega?: string
     endereco?: string
     formaPagamento?: string
@@ -41,9 +44,28 @@ export function normalizePedidoPayload(
     throw new Error('Nome do cliente é obrigatório')
   }
 
+  if (!input.telefone?.trim()) {
+    throw new Error('Telefone é obrigatório para notificações WhatsApp')
+  }
+
+  const telefone = input.telefone.replace(/\D/g, '')
+  if (telefone.length < 10 || telefone.length > 11) {
+    throw new Error('Telefone inválido. Use formato: (11) 98765-4321')
+  }
+
   if (items.length === 0) {
     throw new Error('Carrinho vazio')
   }
+
+  if (!input.telefone) {
+    throw new Error('Telefone é obrigatório')
+  }
+
+  if (!validarTelefoneBrasileiro(input.telefone)) {
+    throw new Error('Telefone inválido')
+  }
+
+  const telefone = limparTelefone(input.telefone)
 
   const total = items.reduce((sum, item) => {
     const extras = (item.extras || []).reduce(
@@ -70,6 +92,7 @@ export function normalizePedidoPayload(
 
   return {
     cliente: input.cliente.trim(),
+    telefone,
     tipoentrega: input.tipoEntrega || null,
     endereco,
     formapagamento: input.formaPagamento || null,

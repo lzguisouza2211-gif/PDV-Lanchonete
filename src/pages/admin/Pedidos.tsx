@@ -239,23 +239,6 @@ export default function PedidosAdmin() {
         {/* Botões de atualização de status */}
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
           <button
-            onClick={() => handleChangeStatus(pedido.id, 'confirmação')}
-            disabled={pedido.status === 'confirmação'}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 8,
-              border: 'none',
-              background: pedido.status === 'confirmação' ? '#ccc' : '#3498db',
-              color: '#fff',
-              cursor: pedido.status === 'confirmação' ? 'not-allowed' : 'pointer',
-              fontWeight: 600,
-              transition: 'all 0.2s',
-            }}
-          >
-            ✅ Confirmar
-          </button>
-
-          <button
             onClick={() => handleChangeStatus(pedido.id, 'Em preparo')}
             disabled={pedido.status === 'Em preparo'}
             style={{
