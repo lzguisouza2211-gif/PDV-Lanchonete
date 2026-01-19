@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback, ForwardedRef 
 import { useCardapio } from '../../hooks/useCardapio'
 import { useCartWithPedidos } from '../../store/useCartWithPedidos'
 import { useStoreStatus } from '../../hooks/useStoreStatus'
+import { useDeliveryFee } from '../../hooks/useDeliveryFee'
 import CategorySection from '../../components/pdv/CategorySection'
 import CartDrawer from '../../components/pdv/CartDrawer'
 import SuccessModal from '../../components/pdv/SuccessModal'
@@ -65,6 +66,7 @@ export default function Cardapio(): JSX.Element {
   const [itens, setItens] = useState<any[]>([])
   const { items, add, remove, criarPedido } = useCartWithPedidos()
   const { isOpen: lojaAberta, loading: statusLoading } = useStoreStatus()
+  const { taxaEntrega } = useDeliveryFee()
 
   const [nome, setNome] = useState('')
     const [telefone, setTelefone] = useState('')
@@ -95,13 +97,16 @@ export default function Cardapio(): JSX.Element {
 
   const totalItens = items.reduce((sum, i) => sum + i.qty, 0)
 
-  const total = items.reduce((s, i) => {
+  const subtotal = items.reduce((s, i) => {
     const extras = (i.extras || []).reduce(
       (sum, e) => sum + (e.tipo === 'add' ? e.preco : 0),
       0
     )
     return s + (i.price + extras) * i.qty
   }, 0)
+
+  // Adiciona taxa de entrega se o tipo for 'entrega'
+  const total = tipoEntrega === 'entrega' ? subtotal + taxaEntrega : subtotal
 
   // Sincroniza itens do hook com estado local para permitir atualizações em tempo real
   useEffect(() => {
@@ -275,6 +280,7 @@ export default function Cardapio(): JSX.Element {
         endereco: tipoEntrega === 'entrega' ? endereco : undefined,
         formaPagamento,
         troco: formaPagamento === 'dinheiro' ? troco : undefined,
+        taxaEntrega: tipoEntrega === 'entrega' ? taxaEntrega : 0,
       })
 
       setNomeClienteSucesso(nome)
@@ -468,6 +474,8 @@ export default function Cardapio(): JSX.Element {
         isOpen={carrinhoAberto}
         onClose={() => setCarrinhoAberto(false)}
         items={items}
+        subtotal={subtotal}
+        taxaEntrega={tipoEntrega === 'entrega' ? taxaEntrega : 0}
         total={total}
         onRemove={remove}
         onAdd={add}

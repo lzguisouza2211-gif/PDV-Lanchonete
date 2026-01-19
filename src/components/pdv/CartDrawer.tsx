@@ -5,6 +5,8 @@ type CartDrawerProps = {
   isOpen: boolean
   onClose: () => void
   items: CartItem[]
+  subtotal: number
+  taxaEntrega: number
   total: number
   onRemove: (cartKey: string) => void
   onAdd: (item: CartItem) => void
@@ -15,6 +17,8 @@ export default function CartDrawer({
   isOpen,
   onClose,
   items,
+  subtotal,
+  taxaEntrega,
   total,
   onRemove,
   onAdd,
@@ -297,11 +301,45 @@ export default function CartDrawer({
             maxHeight: 'calc(100vh - 200px)',
           }}
         >
+          {/* Subtotal */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              marginBottom: 8,
+              fontSize: 14,
+              color: '#666',
+            }}
+          >
+            <span>Subtotal</span>
+            <span>R$ {subtotal.toFixed(2)}</span>
+          </div>
+
+          {/* Taxa de Entrega */}
+          {taxaEntrega > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginBottom: 12,
+                fontSize: 14,
+                color: '#f39c12',
+                fontWeight: 600,
+              }}
+            >
+              <span>Taxa de Entrega</span>
+              <span>R$ {taxaEntrega.toFixed(2)}</span>
+            </div>
+          )}
+
+          {/* Total */}
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
               marginBottom: 12,
+              paddingTop: taxaEntrega > 0 ? 8 : 0,
+              borderTop: taxaEntrega > 0 ? '1px solid #eee' : 'none',
             }}
           >
             <strong>Total</strong>

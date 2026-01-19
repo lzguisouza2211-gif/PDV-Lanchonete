@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { cardapioService } from '../../services/api/cardapio.service';
 import { ingredientesService, Adicional, RetirarIngred } from '../../services/api/ingredientes.service';
+import { deliveryFeeService } from '../../services/api/deliveryFee.service';
 import './GestaoCardapio.css';
 
 interface Produto {
@@ -37,10 +38,27 @@ function GestaoCardapio() {
   const [novoAdicional, setNovoAdicional] = useState({ nome: '', preco: '' });
   const [novoRetirar, setNovoRetirar] = useState('');
   const [loadingIngredientes, setLoadingIngredientes] = useState(false);
+  
+  // Estados para taxa de entrega
+  const [taxaEntrega, setTaxaEntrega] = useState(0);
+  const [editingTaxaEntrega, setEditingTaxaEntrega] = useState(false);
+  const [novoValorTaxaEntrega, setNovoValorTaxaEntrega] = useState('');
+  const [savingTaxaEntrega, setSavingTaxaEntrega] = useState(false);
 
   useEffect(() => {
     fetchProdutos();
+    fetchTaxaEntrega();
   }, []);
+
+  async function fetchTaxaEntrega() {
+    try {
+      const taxa = await deliveryFeeService.getDeliveryFee();
+      setTaxaEntrega(taxa);
+      setNovoValorTaxaEntrega(taxa.toFixed(2));
+    } catch (error) {
+      console.error('Erro ao buscar taxa de entrega:', error);
+    }
+  }
 
   async function fetchProdutos() {
     try {
@@ -218,6 +236,33 @@ function GestaoCardapio() {
       .filter(ing => ing.length > 0);
   };
 
+  // Função para salvar taxa de entrega
+  async function handleSaveTaxaEntrega() {
+    try {
+      const novoValor = parseFloat(novoValorTaxaEntrega);
+      if (isNaN(novoValor) || novoValor < 0) {
+        alert('Valor inválido. Digite um número maior ou igual a 0');
+        return;
+      }
+
+      setSavingTaxaEntrega(true);
+      const sucesso = await deliveryFeeService.updateDeliveryFee(novoValor);
+      
+      if (sucesso) {
+        setTaxaEntrega(novoValor);
+        setEditingTaxaEntrega(false);
+        alert('✓ Taxa de entrega atualizada com sucesso!');
+      } else {
+        alert('Erro ao atualizar taxa de entrega');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar taxa de entrega:', error);
+      alert('Erro ao atualizar taxa de entrega');
+    } finally {
+      setSavingTaxaEntrega(false);
+    }
+  }
+
   const categoriasOrdenadas = React.useMemo(() => {
     const categoriasUnicas = Array.from(new Set(produtos.map(p => p.categoria)));
     const ordenadas = ORDEM_CATEGORIAS.filter(cat => categoriasUnicas.includes(cat));
@@ -264,6 +309,111 @@ function GestaoCardapio() {
             </div>
 
             <div className="gestao-header-actions">
+              {/* Taxa de Entrega */}
+              <div style={{
+                padding: '16px',
+                backgroundColor: '#e8f4f8',
+                borderRadius: '10px',
+                border: '2px solid #3498db',
+                minWidth: '200px'
+              }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#2c3e50',
+                  marginBottom: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  🚚 Taxa de Entrega
+                </label>
+                {editingTaxaEntrega ? (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={novoValorTaxaEntrega}
+                      onChange={(e) => setNovoValorTaxaEntrega(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #3498db',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                      }}
+                      placeholder="0.00"
+                      disabled={savingTaxaEntrega}
+                    />
+                    <button
+                      onClick={handleSaveTaxaEntrega}
+                      disabled={savingTaxaEntrega}
+                      style={{
+                        padding: '8px 12px',
+                        backgroundColor: '#27ae60',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: savingTaxaEntrega ? 'not-allowed' : 'pointer',
+                        fontWeight: '600',
+                        fontSize: '13px',
+                        opacity: savingTaxaEntrega ? 0.6 : 1,
+                      }}
+                    >
+                      {savingTaxaEntrega ? '...' : '✓'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingTaxaEntrega(false);
+                        setNovoValorTaxaEntrega(taxaEntrega.toFixed(2));
+                      }}
+                      disabled={savingTaxaEntrega}
+                      style={{
+                        padding: '8px 12px',
+                        backgroundColor: '#e74c3c',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        fontSize: '13px',
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => {
+                      setEditingTaxaEntrega(true);
+                      setNovoValorTaxaEntrega(taxaEntrega.toFixed(2));
+                    }}
+                    style={{
+                      fontSize: '24px',
+                      fontWeight: '700',
+                      color: '#3498db',
+                      cursor: 'pointer',
+                      padding: '8px 12px',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '6px',
+                      border: '2px dashed #3498db',
+                      textAlign: 'center',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#d5eef7';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#ffffff';
+                    }}
+                  >
+                    R$ {taxaEntrega.toFixed(2)}
+                  </div>
+                )}
+              </div>
+
               <div className="gestao-categoria-select-wrapper">
                 <label className="gestao-categoria-label">Categoria</label>
                 <select

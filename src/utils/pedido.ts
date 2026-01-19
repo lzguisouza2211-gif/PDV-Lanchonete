@@ -10,6 +10,7 @@ export type PedidoPayload = {
   troco: number | null
   status: string
   total: number
+  taxa_entrega: number
   user_id: string | null
   itens: Array<{
     nome: string
@@ -37,6 +38,7 @@ export function normalizePedidoPayload(
     formaPagamento?: string
     troco?: number | string
     user_id?: string | null
+    taxaEntrega?: number
   },
   items: CartItem[]
 ): PedidoPayload {
@@ -58,7 +60,7 @@ export function normalizePedidoPayload(
 
   const telefone = limparTelefone(input.telefone)
 
-  const total = items.reduce((sum, item) => {
+  const subtotal = items.reduce((sum, item) => {
     const extras = (item.extras || []).reduce(
       (s, e) => s + (e.tipo === 'add' ? e.preco : 0),
       0
@@ -66,9 +68,13 @@ export function normalizePedidoPayload(
     return sum + (item.price + extras) * item.qty
   }, 0)
 
-  if (total <= 0) {
+  if (subtotal <= 0) {
     throw new Error('Total inválido')
   }
+
+  // Calcula taxa de entrega apenas se o tipo for 'entrega'
+  const taxaEntrega = input.tipoEntrega === 'entrega' ? (input.taxaEntrega || 0) : 0
+  const total = subtotal + taxaEntrega
 
   let troco: number | null = null
   if (input.troco) {
@@ -90,6 +96,7 @@ export function normalizePedidoPayload(
     troco,
     status: 'Recebido',
     total: Number(total.toFixed(2)),
+    taxa_entrega: Number(taxaEntrega.toFixed(2)),
     user_id: input.user_id || null,
     itens: items.map((item) => ({
       nome: item.name,
