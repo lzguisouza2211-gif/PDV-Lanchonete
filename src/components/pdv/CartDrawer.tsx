@@ -5,8 +5,10 @@ type CartDrawerProps = {
   isOpen: boolean
   onClose: () => void
   items: CartItem[]
+  subtotal: number
+  taxaEntrega: number
   total: number
-  onRemove: (id: string) => void
+  onRemove: (cartKey: string) => void
   onAdd: (item: CartItem) => void
   children: React.ReactNode
 }
@@ -15,6 +17,8 @@ export default function CartDrawer({
   isOpen,
   onClose,
   items,
+  subtotal,
+  taxaEntrega,
   total,
   onRemove,
   onAdd,
@@ -127,7 +131,7 @@ export default function CartDrawer({
 
               return (
                 <div
-                  key={`${item.id}-${index}`}
+                  key={item.cartKey || `${item.id}-${index}`}
                   style={{
                     paddingBottom: 16,
                     marginBottom: 16,
@@ -161,9 +165,10 @@ export default function CartDrawer({
                   {extrasAdd.map((e, i) => (
                     <div
                       key={i}
-                      style={{ fontSize: 12, color: '#27ae60' }}
+                      style={{ fontSize: 12, color: '#27ae60', display: 'flex', justifyContent: 'space-between' }}
                     >
-                      + {e.nome}
+                      <span>+ {e.nome}</span>
+                      <span>+R$ {e.preco.toFixed(2)}</span>
                     </div>
                   ))}
                   {extrasRemove.map((e, i) => (
@@ -219,7 +224,7 @@ export default function CartDrawer({
                         Qtd: {item.qty}
                       </span>
                       <button
-                        onClick={() => onRemove(item.id)}
+                        onClick={() => onRemove(item.cartKey!)}
                         style={{
                           padding: '8px 16px',
                           borderRadius: 8,
@@ -246,7 +251,7 @@ export default function CartDrawer({
                       }}
                     >
                       <button
-                        onClick={() => onRemove(item.id)}
+                        onClick={() => onRemove(item.cartKey!)}
                         style={{
                           width: 36,
                           height: 36,
@@ -296,11 +301,45 @@ export default function CartDrawer({
             maxHeight: 'calc(100vh - 200px)',
           }}
         >
+          {/* Subtotal */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              marginBottom: 8,
+              fontSize: 14,
+              color: '#666',
+            }}
+          >
+            <span>Subtotal</span>
+            <span>R$ {subtotal.toFixed(2)}</span>
+          </div>
+
+          {/* Taxa de Entrega */}
+          {taxaEntrega > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginBottom: 12,
+                fontSize: 14,
+                color: '#f39c12',
+                fontWeight: 600,
+              }}
+            >
+              <span>Taxa de Entrega</span>
+              <span>R$ {taxaEntrega.toFixed(2)}</span>
+            </div>
+          )}
+
+          {/* Total */}
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
               marginBottom: 12,
+              paddingTop: taxaEntrega > 0 ? 8 : 0,
+              borderTop: taxaEntrega > 0 ? '1px solid #eee' : 'none',
             }}
           >
             <strong>Total</strong>
