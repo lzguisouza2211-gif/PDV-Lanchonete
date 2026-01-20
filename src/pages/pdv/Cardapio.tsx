@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useMemo, useRef, useEffect, useCallback, ForwardedRef } from 'react'
 import { useCardapio } from '../../hooks/useCardapio'
 import { useCartWithPedidos } from '../../store/useCartWithPedidos'
 import { useStoreStatus } from '../../hooks/useStoreStatus'
+import { useDeliveryFee } from '../../hooks/useDeliveryFee'
 import CategorySection from '../../components/pdv/CategorySection'
 import CartDrawer from '../../components/pdv/CartDrawer'
 import SuccessModal from '../../components/pdv/SuccessModal'
@@ -10,20 +11,65 @@ import ProductCustomizationModal, {
   ExtraOption,
 } from '../../components/pdv/ProductCustomizationModal'
 import CustomizationPrompt from '../../components/pdv/CustomizationPrompt'
-import { productAddonsService } from '../../services/productAddons'
+
 import { cardapioService } from '../../services/api/cardapio.service'
 import PixKeyDisplay from '../../components/pdv/PixKeyDisplay'
 import { PIX_CONFIG } from '../../config/pix'
-import { useIngredientesIndisponiveisRealtime } from '../../hooks/useIngredientesIndisponiveisRealtime'
 import { useProdutosDisponibilidadeRealtime } from '../../hooks/useProdutosDisponibilidadeRealtime'
+import { validarTelefoneBrasileiro } from '../../utils/validation'
+import { ingredientesService } from '../../services/api/ingredientes.service'
+
+// Componente de input com mask customizado para evitar deprecated findDOMNode
+const MaskedPhoneInput = React.forwardRef((props: any, ref: ForwardedRef<HTMLInputElement>) => {
+  const [value, setValue] = useState(props.value || '')
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(/\D/g, '')
+    
+    if (val.length <= 11) {
+      if (val.length <= 2) {
+        val = val
+      } else if (val.length <= 6) {
+        val = `(${val.slice(0, 2)}) ${val.slice(2)}`
+      } else {
+        val = `(${val.slice(0, 2)}) ${val.slice(2, 7)}-${val.slice(7)}`
+      }
+    }
+    
+    setValue(val)
+    props.onChange({ target: { value: val } })
+  }
+
+  return (
+    <input
+      ref={ref}
+      {...props}
+      value={value}
+      onChange={handleChange}
+      placeholder="(XX) XXXXX-XXXX"
+      style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        marginBottom: 12,
+        padding: 14,
+        fontSize: 16,
+        borderRadius: 10,
+        border: '1px solid #ddd',
+        background: '#fff',
+      }}
+    />
+  )
+})
 
 export default function Cardapio(): JSX.Element {
   const { itens: itensCardapio, loading, error, recarregar } = useCardapio()
   const [itens, setItens] = useState<any[]>([])
   const { items, add, remove, criarPedido } = useCartWithPedidos()
   const { isOpen: lojaAberta, loading: statusLoading } = useStoreStatus()
+  const { taxaEntrega } = useDeliveryFee()
 
   const [nome, setNome] = useState('')
+    const [telefone, setTelefone] = useState('')
   const [tipoEntrega, setTipoEntrega] =
     useState<'retirada' | 'entrega' | 'local'>('retirada')
   const [endereco, setEndereco] = useState('')
@@ -43,19 +89,24 @@ export default function Cardapio(): JSX.Element {
 
   const [produtoSelecionado, setProdutoSelecionado] = useState<any>(null)
   const [extrasDisponiveis, setExtrasDisponiveis] = useState<ExtraOption[]>([])
+  const [ingredientesRemoviveisDisponiveis, setIngredientesRemoviveisDisponiveis] = useState<string[]>([])
   const [produtoAdicionado, setProdutoAdicionado] = useState<string | null>(null)
-  const [ingredientesIndisponiveisHoje, setIngredientesIndisponiveisHoje] = useState<Record<string, string[]>>({})
 
   const enviandoRef = useRef(false)
   const categoriaRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
-  const total = items.reduce((s, i) => {
+  const totalItens = items.reduce((sum, i) => sum + i.qty, 0)
+
+  const subtotal = items.reduce((s, i) => {
     const extras = (i.extras || []).reduce(
       (sum, e) => sum + (e.tipo === 'add' ? e.preco : 0),
       0
     )
     return s + (i.price + extras) * i.qty
   }, 0)
+
+  // Adiciona taxa de entrega se o tipo for 'entrega'
+  const total = tipoEntrega === 'entrega' ? subtotal + taxaEntrega : subtotal
 
   // Sincroniza itens do hook com estado local para permitir atualizações em tempo real
   useEffect(() => {
@@ -95,31 +146,11 @@ export default function Cardapio(): JSX.Element {
     }
   }, [listaCategorias, categoriaAtiva])
 
-  useEffect(() => {
-    const carregarIndisponiveis = async () => {
-      try {
-        const mapa = await cardapioService.listarIngredientesIndisponiveisHoje()
-        setIngredientesIndisponiveisHoje(mapa)
-      } catch (err) {
-        console.error('Erro ao carregar ingredientes indisponíveis para hoje:', err)
-      }
-    }
-
-    carregarIndisponiveis()
-  }, [])
-
-  // Callbacks memoizadas para evitar re-execução infinita dos hooks realtime
-  const handleIngredientesIndisponiveisUpdate = useCallback((mapa: Record<string, string[]>) => {
-    setIngredientesIndisponiveisHoje(mapa)
-  }, [])
-
+  // Callback para atualização de disponibilidade de produtos
   const handleProdutosDisponibilidadeUpdate = useCallback((itensAtualizados: any[]) => {
     setItens(itensAtualizados)
     console.log('📡 Cardápio atualizado em tempo real:', itensAtualizados.length, 'itens')
   }, [])
-
-  // Realtime/Polling para indisponibilidade de ingredientes
-  useIngredientesIndisponiveisRealtime(handleIngredientesIndisponiveisUpdate)
 
   // Realtime/Polling para disponibilidade de produtos (habilitar/desabilitar)
   useProdutosDisponibilidadeRealtime(handleProdutosDisponibilidadeUpdate)
@@ -147,26 +178,22 @@ export default function Cardapio(): JSX.Element {
       return
     }
 
-    // Debug: mostrar categoria, extras e ingredientes
-    console.log('[DEBUG] Produto:', produto.nome, '| Categoria:', produto.categoria)
-
     if (CATEGORIAS_CUSTOMIZAVEIS.includes(produto.categoria)) {
-      const addons = await productAddonsService.getByProduct(produto.id)
-      const extras = addons
-        .filter((a) => a.tipo === 'add')
-        .map((a) => ({
-          id: String(a.id),
-          nome: a.nome,
-          preco: Number(a.preco),
-          tipo: a.tipo,
-        }))
-      const temExtras = extras.length > 0
-      const temRemoviveis = Array.isArray(produto.ingredientes) && produto.ingredientes.length > 0
+      const [extras, removiveis] = await Promise.all([
+        ingredientesService.getAdicionaisPorProduto(produto.id),
+        ingredientesService.getRetirarPorProduto(produto.id),
+      ])
+      const removiveisComFallback = removiveis.length > 0
+        ? removiveis
+        : Array.isArray(produto.ingredientes)
+        ? produto.ingredientes
+        : []
 
-      console.log('[DEBUG] Extras:', extras)
-      console.log('[DEBUG] Ingredientes removíveis:', produto.ingredientes)
+      const temExtras = extras.length > 0
+      const temRemoviveis = removiveisComFallback.length > 0
 
       setExtrasDisponiveis(extras)
+      setIngredientesRemoviveisDisponiveis(removiveisComFallback)
       setProdutoSelecionado(produto)
       if (temExtras || temRemoviveis) {
         setPromptAberto(true)
@@ -191,7 +218,7 @@ export default function Cardapio(): JSX.Element {
       price: produtoSelecionado.preco,
       qty: 1,
       categoria: produtoSelecionado.categoria,
-      ingredientes_indisponiveis: ingredientesIndisponiveisHoje[String(produtoSelecionado.id)] || [],
+      ingredientes_indisponiveis: [],
     })
 
     setProdutoAdicionado(String(produtoSelecionado.id))
@@ -209,15 +236,10 @@ export default function Cardapio(): JSX.Element {
   const handleConfirmCustomization = (data: CustomizationData) => {
     if (!produtoSelecionado) return
 
-    const precoExtras = data.extras.reduce(
-      (sum, e) => sum + (e.tipo === 'add' ? e.preco : 0),
-      0
-    )
-
     add({
       id: String(produtoSelecionado.id),
       name: produtoSelecionado.nome,
-      price: produtoSelecionado.preco + precoExtras,
+      price: produtoSelecionado.preco,
       qty: 1,
       categoria: produtoSelecionado.categoria,
       observacoes: data.observacoes,
@@ -240,20 +262,32 @@ export default function Cardapio(): JSX.Element {
     enviandoRef.current = true
     setEnviando(true)
     setErro(null)
+      // Validações
+      if (!nome.trim()) {
+        throw new Error('Nome é obrigatório')
+      }
+      
+      if (!validarTelefoneBrasileiro(telefone)) {
+        throw new Error('Telefone inválido. Use o formato: (XX) XXXXX-XXXX')
+      }
+
 
     try {
       await criarPedido({
         cliente: nome,
+          telefone,
         tipoEntrega,
         endereco: tipoEntrega === 'entrega' ? endereco : undefined,
         formaPagamento,
         troco: formaPagamento === 'dinheiro' ? troco : undefined,
+        taxaEntrega: tipoEntrega === 'entrega' ? taxaEntrega : 0,
       })
 
       setNomeClienteSucesso(nome)
       setCarrinhoAberto(false)
       setSucesso(true)
       setNome('')
+      setTelefone('')
       setEndereco('')
       setTroco('')
     } catch (e: any) {
@@ -330,25 +364,42 @@ export default function Cardapio(): JSX.Element {
             📂 Escolher categoria
           </label>
 
-          <select
-            value={categoriaAtiva || ''}
-            onChange={(e) => scrollToCategoria(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '12px 14px',
-              fontSize: 16,
-              borderRadius: 10,
-              border: '1px solid #ddd',
-              background: '#fff',
-              appearance: 'none',
-            }}
-          >
-            {listaCategorias.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
+          <div style={{ position: 'relative' }}>
+            <select
+              value={categoriaAtiva || ''}
+              onChange={(e) => scrollToCategoria(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                paddingRight: '40px',
+                fontSize: 16,
+                borderRadius: 10,
+                border: '1px solid #ddd',
+                background: '#fff',
+                appearance: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {listaCategorias.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+            <div
+              style={{
+                position: 'absolute',
+                right: 14,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+                fontSize: 18,
+                color: '#666',
+              }}
+            >
+              ▼
+            </div>
+          </div>
         </div>
       )}
 
@@ -372,7 +423,6 @@ export default function Cardapio(): JSX.Element {
               onAddItem={handleAddItemClick}
               lojaAberta={lojaAberta}
               produtoAdicionado={produtoAdicionado}
-              ingredientesIndisponiveisMap={ingredientesIndisponiveisHoje}
             />
           </div>
         ))}
@@ -396,10 +446,26 @@ export default function Cardapio(): JSX.Element {
             fontWeight: 700,
             display: 'flex',
             justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: '0 4px 16px rgba(39, 174, 96, 0.3)',
+            cursor: 'pointer',
+            transition: 'transform 0.2s ease',
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = 'scale(0.98)'
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = 'scale(1)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)'
           }}
         >
-          <span>{items.length} itens</span>
-          <span>R$ {total.toFixed(2)}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 22 }}>🛒</span>
+            <span>{totalItens} {totalItens === 1 ? 'item' : 'itens'}</span>
+          </div>
+          <span style={{ fontSize: 18 }}>R$ {total.toFixed(2)}</span>
         </button>
       )}
 
@@ -408,6 +474,8 @@ export default function Cardapio(): JSX.Element {
         isOpen={carrinhoAberto}
         onClose={() => setCarrinhoAberto(false)}
         items={items}
+        subtotal={subtotal}
+        taxaEntrega={tipoEntrega === 'entrega' ? taxaEntrega : 0}
         total={total}
         onRemove={remove}
         onAdd={add}
@@ -425,7 +493,7 @@ export default function Cardapio(): JSX.Element {
             disabled={enviando}
             style={{
               width: '100%',
-              boxSizing: 'border-box', // 👈 ESSENCIAL
+              boxSizing: 'border-box',
               marginBottom: 12,
               padding: 14,
               fontSize: 16,
@@ -433,6 +501,13 @@ export default function Cardapio(): JSX.Element {
               border: '1px solid #ddd',
               background: '#fff',
             }}
+          />
+
+          <MaskedPhoneInput
+            placeholder="Telefone *"
+            value={telefone}
+            onChange={(e: any) => setTelefone(e.target.value)}
+            disabled={enviando}
           />
 
           <select
@@ -547,14 +622,14 @@ export default function Cardapio(): JSX.Element {
 
           <button
             onClick={finalizar}
-            disabled={enviando || !nome.trim() || items.length === 0}
+            disabled={enviando || !nome.trim() || !telefone.trim() || telefone.length < 10 || items.length === 0}
             style={{
               width: '100%',
               padding: 16,
               borderRadius: 10,
               border: 'none',
               background:
-                enviando || !nome.trim() || items.length === 0
+                enviando || !nome.trim() || !telefone.trim() || telefone.length < 10 || items.length === 0
                   ? '#95a5a6'
                   : '#27ae60',
               color: '#fff',
@@ -591,8 +666,8 @@ export default function Cardapio(): JSX.Element {
           isOpen={modalCustomizacaoAberto}
           produto={produtoSelecionado}
           extrasDisponiveis={CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) ? extrasDisponiveis : []}
-          ingredientesRemoviveis={CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) ? (produtoSelecionado.ingredientes || []) : []}
-          ingredientesIndisponiveis={ingredientesIndisponiveisHoje[String(produtoSelecionado.id)] || []}
+          ingredientesRemoviveis={CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) ? ingredientesRemoviveisDisponiveis : []}
+          ingredientesIndisponiveis={[]}
           onConfirm={handleConfirmCustomization}
           onClose={() => {
             setModalCustomizacaoAberto(false)

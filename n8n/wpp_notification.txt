@@ -1,0 +1,92 @@
+{
+  "name": "Pedido - Notificação WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "pedido-status",
+        "methods": ["POST"],
+        "responseMode": "lastNode",
+        "responseData": "firstEntryJson"
+      },
+      "id": "Webhook",
+      "name": "Webhook pedido-status",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "expressionType": "object",
+        "values": {
+          "status": "={{$json.status}}",
+          "tipo": "={{$json.tipoentrega || 'retirada'}}",
+          "pedido_id": "={{$json.pedido_id}}",
+          "cliente": "={{$json.cliente}}",
+          "telefone": "={{$json.telefone}}",
+          "total": "={{$json.total}}"
+        }
+      },
+      "id": "Set",
+      "name": "Set dados",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{$json.status}}", "operation": "equals", "value2": "Recebido" },
+            { "value1": "={{$json.status}}", "operation": "equals", "value2": "Em preparo" },
+            { "value1": "={{$json.status}}", "operation": "equals", "value2": "Finalizado" }
+          ],
+          "combinator": "or"
+        }
+      },
+      "id": "If",
+      "name": "Status válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v17.0/<PHONE_NUMBER_ID>/messages",
+        "method": "POST",
+        "headerParametersJson": "{\"Authorization\":\"Bearer <WHATSAPP_TOKEN>\",\"Content-Type\":\"application/json\"}",
+        "bodyParametersJson": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": $json.telefone,\n  \"type\": \"text\",\n  \"text\": { \"body\": \"Pedido #{{$json.pedido_id}} recebido!\" }\n}"
+      },
+      "id": "HttpWpp",
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "{{$json.supabase_url || '<SUPABASE_URL>'}}/rest/v1/notification_logs",
+        "method": "POST",
+        "headerParametersJson": "{\"apikey\":\"<SUPABASE_SERVICE_ROLE_KEY>\",\"Authorization\":\"Bearer <SUPABASE_SERVICE_ROLE_KEY>\",\"Content-Type\":\"application/json\"}",
+        "bodyParametersJson": "={\n  \"pedido_id\": $json.pedido_id,\n  \"notification_type\": \"whatsapp\",\n  \"status\": \"error\",\n  \"attempt_number\": 2,\n  \"error_message\": \"{{$json.body?.error?.message || 'Falha WhatsApp'}}\",\n  \"error_code\": \"{{$json.statusCode}}\",\n  \"payload\": $json\n}"
+      },
+      "id": "HttpLogErro",
+      "name": "Log erro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 450],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Set", "type": "main", "index": 0 }]] },
+    "Set": { "main": [[{ "node": "If", "type": "main", "index": 0 }]] },
+    "If": {
+      "main": [
+        [{ "node": "HttpWpp", "type": "main", "index": 0 }],
+        [{ "node": "HttpLogErro", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}

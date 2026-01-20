@@ -3,6 +3,7 @@ export type Produto = {
   nome: string
   preco: number
   descricao?: string
+  disponivel?: boolean
 }
 
 export type ExtraItem = {

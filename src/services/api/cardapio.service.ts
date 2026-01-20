@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient'
+import { logger } from '../logger/logger'
 
 export type ItemCardapio = {
   id: string
@@ -71,7 +72,7 @@ class CardapioService {
   }
 
   async toggleDisponibilidade(id: string): Promise<void> {
-    console.log('🔄 Toggling disponibilidade para produto:', id)
+    logger.info('🔄 Toggling disponibilidade para produto:', id)
     
     // Primeiro busca o produto atual para pegar o estado de disponibilidade
     const { data: current, error: fetchError } = await supabase
@@ -81,11 +82,11 @@ class CardapioService {
       .single()
 
     if (fetchError) {
-      console.error('❌ Erro ao buscar produto:', fetchError)
+      logger.error('❌ Erro ao buscar produto:', fetchError)
       throw new Error('Erro ao buscar produto. Verifique se a coluna "disponivel" existe no banco.')
     }
 
-    console.log('📦 Produto atual completo:', current)
+    logger.info('📦 Produto atual completo:', current)
 
     // Verifica se a coluna disponivel existe
     if (!('disponivel' in current)) {
@@ -94,7 +95,7 @@ class CardapioService {
 
     // Inverte o estado
     const novoEstado = !current?.disponivel
-    console.log('🔄 Novo estado:', novoEstado)
+    logger.info('🔄 Novo estado:', novoEstado)
 
     // Atualiza sem esperar retorno (evita problemas com RLS)
     const { error, status, statusText } = await supabase
@@ -102,14 +103,14 @@ class CardapioService {
       .update({ disponivel: novoEstado })
       .eq('id', id)
 
-    console.log('📊 Status da atualização:', { status, statusText })
+    logger.info('📊 Status da atualização:', { status, statusText })
 
     if (error) {
-      console.error('❌ Erro ao atualizar produto:', error)
+      logger.error('❌ Erro ao atualizar produto:', error)
       throw error
     }
 
-    console.log('✅ Produto atualizado com sucesso!')
+    logger.info('✅ Produto atualizado com sucesso!')
   }
 
   async atualizarPreco(id: string, novoPreco: number): Promise<void> {
@@ -120,60 +121,6 @@ class CardapioService {
 
     if (error) {
       throw error
-    }
-  }
-
-  async listarIngredientesIndisponiveisHoje(): Promise<Record<string, string[]>> {
-    const hoje = new Date().toISOString().split('T')[0]
-
-    const { data, error } = await supabase
-      .from('ingredientes_indisponiveis_dia')
-      .select('cardapio_id, ingrediente')
-      .eq('valid_on', hoje)
-
-    if (error) {
-      throw error
-    }
-
-    const mapa: Record<string, string[]> = {}
-    ;(data || []).forEach((row: any) => {
-      const key = String(row.cardapio_id)
-      if (!mapa[key]) mapa[key] = []
-      mapa[key].push(row.ingrediente)
-    })
-
-    return mapa
-  }
-
-  async definirIngredienteIndisponivel(
-    cardapioId: string,
-    ingrediente: string,
-    indisponivel: boolean,
-  ): Promise<void> {
-    const hoje = new Date().toISOString().split('T')[0]
-
-    if (indisponivel) {
-      const { error } = await supabase
-        .from('ingredientes_indisponiveis_dia')
-        .upsert(
-          [{ cardapio_id: Number(cardapioId), ingrediente, valid_on: hoje }],
-          { onConflict: 'cardapio_id,ingrediente,valid_on' }
-        )
-
-      if (error) {
-        throw error
-      }
-    } else {
-      const { error } = await supabase
-        .from('ingredientes_indisponiveis_dia')
-        .delete()
-        .eq('cardapio_id', cardapioId)
-        .eq('ingrediente', ingrediente)
-        .eq('valid_on', hoje)
-
-      if (error) {
-        throw error
-      }
     }
   }
 }

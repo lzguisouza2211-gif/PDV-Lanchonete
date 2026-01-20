@@ -9,6 +9,10 @@ export type CartItem = {
   name: string
   price: number
   qty: number
+  categoria?: string
+  observacoes?: string
+  ingredientes_indisponiveis?: string[]
+  extras?: Array<{ nome: string; preco: number; tipo: 'add' | 'remove' }>
 }
 
 type CartState = {

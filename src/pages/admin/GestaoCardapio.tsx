@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { cardapioService } from '../../services/api/cardapio.service';
+import { ingredientesService, Adicional, RetirarIngred } from '../../services/api/ingredientes.service';
+import { deliveryFeeService } from '../../services/api/deliveryFee.service';
 import './GestaoCardapio.css';
 
 interface Produto {
@@ -11,10 +13,6 @@ interface Produto {
   categoria: string;
   disponivel: boolean;
   ingredientes?: string[];
-}
-
-interface IngredientesIndisponivelMap {
-  [produtoId: string]: string[];
 }
 
 const ORDEM_CATEGORIAS = [
@@ -34,11 +32,33 @@ function GestaoCardapio() {
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<string>('Todos');
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
   const [editingPriceValue, setEditingPriceValue] = useState('');
-  const [ingredientesIndisponiveis, setIngredientesIndisponiveis] = useState<IngredientesIndisponivelMap>({});
+  const [produtoSelecionadoIngredientes, setProdutoSelecionadoIngredientes] = useState<Produto | null>(null);
+  const [adicionais, setAdicionais] = useState<Adicional[]>([]);
+  const [retirar, setRetirar] = useState<RetirarIngred[]>([]);
+  const [novoAdicional, setNovoAdicional] = useState({ nome: '', preco: '' });
+  const [novoRetirar, setNovoRetirar] = useState('');
+  const [loadingIngredientes, setLoadingIngredientes] = useState(false);
+  
+  // Estados para taxa de entrega
+  const [taxaEntrega, setTaxaEntrega] = useState(0);
+  const [editingTaxaEntrega, setEditingTaxaEntrega] = useState(false);
+  const [novoValorTaxaEntrega, setNovoValorTaxaEntrega] = useState('');
+  const [savingTaxaEntrega, setSavingTaxaEntrega] = useState(false);
 
   useEffect(() => {
     fetchProdutos();
+    fetchTaxaEntrega();
   }, []);
+
+  async function fetchTaxaEntrega() {
+    try {
+      const taxa = await deliveryFeeService.getDeliveryFee();
+      setTaxaEntrega(taxa);
+      setNovoValorTaxaEntrega(taxa.toFixed(2));
+    } catch (error) {
+      console.error('Erro ao buscar taxa de entrega:', error);
+    }
+  }
 
   async function fetchProdutos() {
     try {
@@ -53,15 +73,113 @@ function GestaoCardapio() {
       
       const produtosData = (data || []) as Produto[];
       setProdutos(produtosData);
-      
-      // Carregar ingredientes indisponíveis
-      const indisponiveis = await cardapioService.listarIngredientesIndisponiveisHoje();
-      setIngredientesIndisponiveis(indisponiveis);
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
       alert('Erro ao carregar produtos');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function carregarIngredientes(produtoId: number) {
+    try {
+      setLoadingIngredientes(true);
+      const [adicionaisData, retirarData] = await Promise.all([
+        ingredientesService.getAdicionaisAdminPorProduto(produtoId),
+        ingredientesService.getRetirarAdminPorProduto(produtoId),
+      ]);
+      setAdicionais(adicionaisData);
+      setRetirar(retirarData);
+    } catch (error) {
+      console.error('Erro ao carregar ingredientes:', error);
+    } finally {
+      setLoadingIngredientes(false);
+    }
+  }
+
+  async function abrirIngredientes(produto: Produto) {
+    setProdutoSelecionadoIngredientes(produto);
+    await carregarIngredientes(produto.id);
+  }
+
+  async function adicionarNovoAdicional() {
+    if (!produtoSelecionadoIngredientes || !novoAdicional.nome || !novoAdicional.preco) {
+      alert('Preencha nome e preço');
+      return;
+    }
+
+    try {
+      const resultado = await ingredientesService.criarAdicional(
+        produtoSelecionadoIngredientes.id,
+        novoAdicional.nome,
+        parseFloat(novoAdicional.preco)
+      );
+      if (resultado) {
+        setAdicionais([...adicionais, resultado]);
+        setNovoAdicional({ nome: '', preco: '' });
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar:', error);
+      alert('Erro ao adicionar');
+    }
+  }
+
+  async function adicionarNovoRetirar() {
+    if (!produtoSelecionadoIngredientes || !novoRetirar) {
+      alert('Digite o nome do ingrediente');
+      return;
+    }
+
+    try {
+      const resultado = await ingredientesService.criarRetirar(
+        produtoSelecionadoIngredientes.id,
+        novoRetirar
+      );
+      if (resultado) {
+        setRetirar([...retirar, resultado]);
+        setNovoRetirar('');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar:', error);
+      alert('Erro ao adicionar');
+    }
+  }
+
+  async function toggleAtivoAdicional(id: number, ativo: boolean) {
+    try {
+      await ingredientesService.atualizarAdicional(id, { ativo: !ativo });
+      setAdicionais(adicionais.map(a => a.id === id ? { ...a, ativo: !ativo } : a));
+    } catch (error) {
+      console.error('Erro ao atualizar:', error);
+    }
+  }
+
+  async function toggleAtivoRetirar(id: number, ativo: boolean) {
+    try {
+      await ingredientesService.atualizarRetirar(id, { ativo: !ativo });
+      setRetirar(retirar.map(r => r.id === id ? { ...r, ativo: !ativo } : r));
+    } catch (error) {
+      console.error('Erro ao atualizar:', error);
+    }
+  }
+
+  async function excluirAdicional(id: number) {
+    if (!window.confirm('Deseja excluir este ingrediente?')) return;
+    try {
+      await ingredientesService.excluirAdicional(id);
+      setAdicionais(adicionais.filter(a => a.id !== id));
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
+    }
+  }
+
+  async function excluirRetirar(id: number) {
+    if (!window.confirm('Deseja excluir este ingrediente?')) return;
+    try {
+      await ingredientesService.excluirRetirar(id);
+      setRetirar(retirar.filter(r => r.id !== id));
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
     }
   }
 
@@ -108,30 +226,6 @@ function GestaoCardapio() {
     }
   };
 
-  const handleToggleIngrediente = async (produtoId: number | string, ingrediente: string) => {
-    try {
-      const idStr = String(produtoId);
-      const lista = ingredientesIndisponiveis[idStr] || [];
-      const jaIndisponivel = lista.includes(ingrediente);
-      
-      // Atualização otimista
-      setIngredientesIndisponiveis(prev => ({
-        ...prev,
-        [idStr]: jaIndisponivel
-          ? prev[idStr].filter(ing => ing !== ingrediente)
-          : [...(prev[idStr] || []), ingrediente]
-      }));
-      
-      // Sincroniza com banco
-      await cardapioService.definirIngredienteIndisponivel(idStr, ingrediente, !jaIndisponivel);
-    } catch (error) {
-      console.error('Erro ao atualizar ingrediente:', error);
-      alert('Erro ao atualizar ingrediente');
-      // Recarregar
-      fetchProdutos();
-    }
-  };
-
   // Extrai ingredientes da descrição
   const extrairIngredientes = (descricao: string): string[] => {
     if (!descricao) return [];
@@ -141,6 +235,33 @@ function GestaoCardapio() {
       .map(ing => ing.trim())
       .filter(ing => ing.length > 0);
   };
+
+  // Função para salvar taxa de entrega
+  async function handleSaveTaxaEntrega() {
+    try {
+      const novoValor = parseFloat(novoValorTaxaEntrega);
+      if (isNaN(novoValor) || novoValor < 0) {
+        alert('Valor inválido. Digite um número maior ou igual a 0');
+        return;
+      }
+
+      setSavingTaxaEntrega(true);
+      const sucesso = await deliveryFeeService.updateDeliveryFee(novoValor);
+      
+      if (sucesso) {
+        setTaxaEntrega(novoValor);
+        setEditingTaxaEntrega(false);
+        alert('✓ Taxa de entrega atualizada com sucesso!');
+      } else {
+        alert('Erro ao atualizar taxa de entrega');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar taxa de entrega:', error);
+      alert('Erro ao atualizar taxa de entrega');
+    } finally {
+      setSavingTaxaEntrega(false);
+    }
+  }
 
   const categoriasOrdenadas = React.useMemo(() => {
     const categoriasUnicas = Array.from(new Set(produtos.map(p => p.categoria)));
@@ -188,6 +309,111 @@ function GestaoCardapio() {
             </div>
 
             <div className="gestao-header-actions">
+              {/* Taxa de Entrega */}
+              <div style={{
+                padding: '16px',
+                backgroundColor: '#e8f4f8',
+                borderRadius: '10px',
+                border: '2px solid #3498db',
+                minWidth: '200px'
+              }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#2c3e50',
+                  marginBottom: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  🚚 Taxa de Entrega
+                </label>
+                {editingTaxaEntrega ? (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={novoValorTaxaEntrega}
+                      onChange={(e) => setNovoValorTaxaEntrega(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #3498db',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                      }}
+                      placeholder="0.00"
+                      disabled={savingTaxaEntrega}
+                    />
+                    <button
+                      onClick={handleSaveTaxaEntrega}
+                      disabled={savingTaxaEntrega}
+                      style={{
+                        padding: '8px 12px',
+                        backgroundColor: '#27ae60',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: savingTaxaEntrega ? 'not-allowed' : 'pointer',
+                        fontWeight: '600',
+                        fontSize: '13px',
+                        opacity: savingTaxaEntrega ? 0.6 : 1,
+                      }}
+                    >
+                      {savingTaxaEntrega ? '...' : '✓'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingTaxaEntrega(false);
+                        setNovoValorTaxaEntrega(taxaEntrega.toFixed(2));
+                      }}
+                      disabled={savingTaxaEntrega}
+                      style={{
+                        padding: '8px 12px',
+                        backgroundColor: '#e74c3c',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        fontSize: '13px',
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => {
+                      setEditingTaxaEntrega(true);
+                      setNovoValorTaxaEntrega(taxaEntrega.toFixed(2));
+                    }}
+                    style={{
+                      fontSize: '24px',
+                      fontWeight: '700',
+                      color: '#3498db',
+                      cursor: 'pointer',
+                      padding: '8px 12px',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '6px',
+                      border: '2px dashed #3498db',
+                      textAlign: 'center',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#d5eef7';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#ffffff';
+                    }}
+                  >
+                    R$ {taxaEntrega.toFixed(2)}
+                  </div>
+                )}
+              </div>
+
               <div className="gestao-categoria-select-wrapper">
                 <label className="gestao-categoria-label">Categoria</label>
                 <select
@@ -297,26 +523,25 @@ function GestaoCardapio() {
                     </button>
                   </div>
 
-                  {/* Ingredientes - Direto da descrição */}
-                  {produto.descricao && (
-                    <div className="card-ingredientes-inline">
-                      <div className="ingredientes-label">Ingredientes:</div>
-                      <div className="ingredientes-buttons">
-                        {extrairIngredientes(produto.descricao).map(ing => {
-                          const indispo = (ingredientesIndisponiveis[String(produto.id)] || []).includes(ing);
-                          return (
-                            <button
-                              key={ing}
-                              className={`ingrediente-badge ${indispo ? 'indisponivel' : 'disponivel'}`}
-                              onClick={() => handleToggleIngrediente(produto.id, ing)}
-                              title={indispo ? 'Marcar como disponível' : 'Marcar como indisponível'}
-                            >
-                              {ing}
-                              <span className="badge-icon">{indispo ? '✕' : '✓'}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                  {/* Botão Ingredientes */}
+                  {['Lanches', 'Macarrão', 'Omeletes'].includes(produto.categoria) && (
+                    <div style={{ marginTop: '12px' }}>
+                      <button
+                        onClick={() => abrirIngredientes(produto)}
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          backgroundColor: '#3498db',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                        }}
+                      >
+                        🥘 Editar ingredientes
+                      </button>
                     </div>
                   )}
                 </div>
@@ -325,6 +550,106 @@ function GestaoCardapio() {
           )}
         </section>
       </main>
+
+      {/* Modal de Ingredientes */}
+      {produtoSelecionadoIngredientes && (
+        <div className="gestao-modal-overlay" onClick={() => setProdutoSelecionadoIngredientes(null)}>
+          <div className="gestao-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="gestao-modal-header">
+              <h3>Ingredientes - {produtoSelecionadoIngredientes.nome}</h3>
+              <button className="modal-close" onClick={() => setProdutoSelecionadoIngredientes(null)}>
+                ✕
+              </button>
+            </div>
+
+            {loadingIngredientes ? (
+              <p style={{ padding: '12px' }}>Carregando ingredientes...</p>
+            ) : (
+              <div className="ingredientes-grid">
+                <div className="ingredientes-col">
+                  <h4>Adicionáveis</h4>
+                  <div className="ingredientes-list">
+                    {adicionais.map((item) => (
+                      <div key={item.id} className="ingrediente-row">
+                        <div>
+                          <div className="ingrediente-nome">{item.nome}</div>
+                          <div className="ingrediente-preco">R$ {item.preco.toFixed(2)}</div>
+                        </div>
+                        <div className="ingrediente-actions">
+                          <label className="switch">
+                            <input
+                              type="checkbox"
+                              checked={item.ativo}
+                              onChange={() => toggleAtivoAdicional(item.id, item.ativo)}
+                            />
+                            <span className="slider" />
+                          </label>
+                          <button className="btn-danger" onClick={() => excluirAdicional(item.id)}>
+                            Excluir
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {adicionais.length === 0 && <p className="ingredientes-empty">Nenhum adicional</p>}
+                  </div>
+
+                  <div className="ingrediente-form">
+                    <input
+                      type="text"
+                      placeholder="Nome do adicional"
+                      value={novoAdicional.nome}
+                      onChange={(e) => setNovoAdicional({ ...novoAdicional, nome: e.target.value })}
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Preço"
+                      value={novoAdicional.preco}
+                      onChange={(e) => setNovoAdicional({ ...novoAdicional, preco: e.target.value })}
+                    />
+                    <button className="btn-primary" onClick={adicionarNovoAdicional}>Adicionar</button>
+                  </div>
+                </div>
+
+                <div className="ingredientes-col">
+                  <h4>Removíveis</h4>
+                  <div className="ingredientes-list">
+                    {retirar.map((item) => (
+                      <div key={item.id} className="ingrediente-row">
+                        <div className="ingrediente-nome">{item.nome}</div>
+                        <div className="ingrediente-actions">
+                          <label className="switch">
+                            <input
+                              type="checkbox"
+                              checked={item.ativo}
+                              onChange={() => toggleAtivoRetirar(item.id, item.ativo)}
+                            />
+                            <span className="slider" />
+                          </label>
+                          <button className="btn-danger" onClick={() => excluirRetirar(item.id)}>
+                            Excluir
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {retirar.length === 0 && <p className="ingredientes-empty">Nenhum removível</p>}
+                  </div>
+
+                  <div className="ingrediente-form">
+                    <input
+                      type="text"
+                      placeholder="Nome do ingrediente"
+                      value={novoRetirar}
+                      onChange={(e) => setNovoRetirar(e.target.value)}
+                    />
+                    <button className="btn-primary" onClick={adicionarNovoRetirar}>Adicionar</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

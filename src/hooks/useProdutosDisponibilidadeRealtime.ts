@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../services/supabaseClient'
 import { cardapioService } from '../services/api/cardapio.service'
+import { logger } from '../services/logger/logger'
 
 /**
  * Hook que mantém sincronizado a disponibilidade dos produtos
@@ -11,16 +12,22 @@ export function useProdutosDisponibilidadeRealtime(
   onUpdate: (itens: any[]) => void
 ) {
   const [isRealtime, setIsRealtime] = useState(false)
+  const onUpdateRef = useRef(onUpdate)
+
+  // Mantém a referência atualizada sem causar re-render
+  useEffect(() => {
+    onUpdateRef.current = onUpdate
+  }, [onUpdate])
 
   useEffect(() => {
     // Carrega inicial
     const loadInitial = async () => {
       try {
         const itens = await cardapioService.list()
-        onUpdate(itens)
-        console.log('✅ Cardápio carregado inicialmente:', itens.length, 'itens')
+        onUpdateRef.current(itens)
+        logger.info('✅ Cardápio carregado inicialmente:', itens.length, 'itens')
       } catch (err) {
-        console.error('Erro ao carregar cardápio:', err)
+        logger.error('Erro ao carregar cardápio:', err)
       }
     }
 
@@ -38,7 +45,7 @@ export function useProdutosDisponibilidadeRealtime(
           table: 'cardapio',
         },
         async (payload: any) => {
-          console.log('📡 Evento realtime de produto recebido:', {
+          logger.info('📡 Evento realtime de produto recebido:', {
             event: payload.eventType,
             id: payload.new?.id || payload.old?.id,
             nome: payload.new?.nome || payload.old?.nome,
@@ -49,10 +56,10 @@ export function useProdutosDisponibilidadeRealtime(
 
           try {
             const itens = await cardapioService.list()
-            onUpdate(itens)
-            console.log('✅ Cardápio sincronizado via realtime')
+            onUpdateRef.current(itens)
+            logger.info('✅ Cardápio sincronizado via realtime')
           } catch (err) {
-            console.error('Erro ao atualizar realtime de produtos:', err)
+            logger.error('Erro ao atualizar realtime de produtos:', err)
           }
         }
       )
@@ -64,17 +71,17 @@ export function useProdutosDisponibilidadeRealtime(
 
       try {
         const itens = await cardapioService.list()
-        onUpdate(itens)
-        console.log('⏱️ Cardápio sincronizado via polling')
+        onUpdateRef.current(itens)
+        logger.info('⏱️ Cardápio sincronizado via polling')
       } catch (err) {
-        console.error('Erro no polling de produtos:', err)
+        logger.error('Erro no polling de produtos:', err)
       }
     }, 5000)
 
     // Após 10 segundos sem evento realtime, ativa polling
     const realtimeTimeout = setTimeout(() => {
       if (!realtimeWorking) {
-        console.warn(
+        logger.warn(
           '⏱️ Realtime de produtos não respondeu em 10s. Usando polling como fallback.'
         )
         setIsRealtime(false)
@@ -86,7 +93,7 @@ export function useProdutosDisponibilidadeRealtime(
       clearTimeout(realtimeTimeout)
       supabase.removeChannel(channel)
     }
-  }, [onUpdate])
+  }, [])
 
   return { isRealtime }
 }

@@ -10,10 +10,12 @@ export function useCartWithPedidos() {
 
   async function criarPedido(input: {
     cliente: string
+    telefone: string
     tipoEntrega?: string
     endereco?: string
     formaPagamento?: string
     troco?: number | string
+    taxaEntrega?: number
   }) {
     // Tentar obter user_id se houver sessão autenticada
     let userId: string | null = null

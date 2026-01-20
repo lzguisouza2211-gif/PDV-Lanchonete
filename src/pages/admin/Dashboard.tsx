@@ -4,6 +4,7 @@ import { Pedido } from '../../services/api/pedidos.service'
 import { useStoreStatus } from '../../hooks/useStoreStatus'
 import OrderMonitor from '../../components/admin/OrderMonitor'
 import QuickMenuManagement from '../../components/admin/QuickMenuManagement'
+import PrintQueueMonitor from '../../components/admin/PrintQueueMonitor'
 
 export default function Dashboard() {
   const { listPedidos, loading, error } = usePedidos()
@@ -155,6 +156,11 @@ export default function Dashboard() {
           cor="#9b59b6"
           icone="🏪"
         />
+      </div>
+
+      {/* MONITOR DE FILA DE IMPRESSÃO */}
+      <div style={{ marginBottom: 32 }}>
+        <PrintQueueMonitor />
       </div>
 
       {/* MONITOR DE PEDIDOS */}

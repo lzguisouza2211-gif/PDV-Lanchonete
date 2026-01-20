@@ -37,14 +37,11 @@ export default function ProductCustomizationModal({
   ingredientesIndisponiveis = [],
   onConfirm,
 }: ProductCustomizationModalProps) {
-  if (!isOpen) return null
-
   const [extrasSelecionados, setExtrasSelecionados] = useState<string[]>([])
   const [ingredientesRemovidos, setIngredientesRemovidos] = useState<string[]>([])
   const [observacoes, setObservacoes] = useState('')
   const [adicionarExpandido, setAdicionarExpandido] = useState(false)
   const [retirarExpandido, setRetirarExpandido] = useState(false)
-  const [substituicoes, setSubstituicoes] = useState<Record<string, string>>({})
 
   // Resetar estados quando o modal fechar
   useEffect(() => {
@@ -54,7 +51,15 @@ export default function ProductCustomizationModal({
       setObservacoes('')
       setAdicionarExpandido(false)
       setRetirarExpandido(false)
-      setSubstituicoes({})
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
     }
   }, [isOpen])
 
@@ -78,28 +83,26 @@ export default function ProductCustomizationModal({
     [indisponiveisHoje]
   )
 
-  const extrasAdicionais = extrasDisponiveis.filter((e) => e.tipo === 'add')
-  // Mapeia extras com flag de substituição para ingredientes indisponíveis
-  const extrasComSubstituicao = extrasAdicionais.map((extra) => ({
-    ...extra,
-    isSubstituicao: indisponiveisSet.has(extra.nome.toLowerCase()),
-  }))
-  
+  const extrasAddList = useMemo(
+    () => (Array.isArray(extrasDisponiveis) ? extrasDisponiveis : []).filter((e) => e.tipo === 'add'),
+    [extrasDisponiveis]
+  )
+
+  const extrasSelecionadosDetalhe = useMemo(
+    () => extrasAddList.filter((extra) => extrasSelecionados.includes(extra.id)),
+    [extrasAddList, extrasSelecionados]
+  )
+
+  const totalExtrasAdicionados = useMemo(
+    () => extrasSelecionadosDetalhe.reduce((sum, extra) => sum + extra.preco, 0),
+    [extrasSelecionadosDetalhe]
+  )
+
   // Garantir que ingredientesRemoviveis seja array
   const ingredientesLista = Array.isArray(ingredientesRemoviveis) ? ingredientesRemoviveis : []
 
   useEffect(() => {
     if (!isOpen) return
-
-    // Não adiciona ingredientes indisponíveis ao ingredientesRemovidos
-    // Eles serão tratados separadamente no handleConfirm
-
-    setSubstituicoes(
-      indisponiveisHoje.reduce((acc, ing) => {
-        acc[ing] = ''
-        return acc
-      }, {} as Record<string, string>)
-    )
 
     if (indisponiveisHoje.length > 0) {
       setRetirarExpandido(true)
@@ -108,7 +111,7 @@ export default function ProductCustomizationModal({
 
   const toggleExtra = (id: string) => {
     setExtrasSelecionados((prev) =>
-      prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((extraId) => extraId !== id) : [...prev, id]
     )
   }
 
@@ -121,70 +124,18 @@ export default function ProductCustomizationModal({
   }
 
   const calcularPrecoTotal = () => {
-    const precoBase = produto.preco
-
-    // Número de ingredientes grátis = número de ingredientes faltando
-    const qtdGratis = indisponiveisHoje.length
-
-    // Extras selecionados (sem substituições - aquelas já são de substituição)
-    const extras = extrasSelecionados.map((id) =>
-      extrasDisponiveis.find((e) => e.id === id)
-    ).filter((e): e is ExtraOption => !!e)
-
-    // Ordena extras por preço descendente (mais caros primeiro ficam grátis)
-    const extrasOrdenados = [...extras].sort((a, b) => b.preco - a.preco)
-
-    // Primeiros N extras são grátis (onde N = qtd de indisponíveis)
-    const precoExtras = extrasOrdenados.reduce((total, extra, index) => {
-      const ehGratis = index < qtdGratis
-      return total + (ehGratis ? 0 : extra.preco)
-    }, 0)
-
-    return precoBase + precoExtras
+    return produto.preco + totalExtrasAdicionados
   }
-
-  // Determina quais extras são grátis
-  const extrasGratisMap = useMemo(() => {
-    const qtdGratis = indisponiveisHoje.length
-    const extras = extrasSelecionados.map((id) =>
-      extrasDisponiveis.find((e) => e.id === id)
-    ).filter((e): e is ExtraOption => !!e)
-
-    const extrasOrdenados = [...extras].sort((a, b) => b.preco - a.preco)
-    const gratis = new Set(extrasOrdenados.slice(0, qtdGratis).map((e) => e.id))
-    return gratis
-  }, [extrasSelecionados, indisponiveisHoje, extrasDisponiveis])
 
   const handleConfirm = () => {
     // Apenas ingredientes removidos pelo usuário (não incluir os indisponíveis aqui)
-    // Os indisponíveis serão enviados separadamente no campo ingredientes_indisponiveis
     const indisponiveisSet = new Set(indisponiveisHoje.map(i => i.toLowerCase()))
     const removidosSet = new Set<string>(
       ingredientesRemovidos.filter(ing => !indisponiveisSet.has(ing.toLowerCase()))
     )
 
-    const extrasSelecionadosObjs = extrasSelecionados
-      .map((id) => extrasDisponiveis.find((e) => e.id === id))
-      .filter((e): e is ExtraOption => !!e)
-
-    const substituicoesExtras = Object.values(substituicoes)
-      .filter((id) => !!id)
-      .map((id) => extrasDisponiveis.find((e) => e.id === id))
-      .filter((e): e is ExtraOption => !!e)
-
-    const extrasMap = new Map<string, ExtraOption>()
-    ;[...extrasSelecionadosObjs, ...substituicoesExtras].forEach((extra) => {
-      extrasMap.set(extra.id, extra)
-    })
-
-    // Determina quais extras são grátis (por substituição)
-    const qtdGratis = indisponiveisHoje.length
-    const extras = Array.from(extrasMap.values())
-    const extrasOrdenados = [...extras].sort((a, b) => b.preco - a.preco)
-    const gratisSet = new Set(extrasOrdenados.slice(0, qtdGratis).map((e) => e.id))
-
     const extras_final: ExtraOption[] = [
-      ...extrasMap.values(),
+      ...extrasSelecionadosDetalhe,
       ...Array.from(removidosSet).map((nome) => ({
         id: `remove-${nome}`,
         nome,
@@ -193,14 +144,8 @@ export default function ProductCustomizationModal({
       })),
     ]
 
-    // Marca os extras que são grátis por substituição
-    const extrasComMarcacao = extras_final.map((e) => ({
-      ...e,
-      _isFreeSubstituicao: gratisSet.has(e.id),
-    }))
-
     onConfirm({
-      extras: extrasComMarcacao as ExtraOption[],
+      extras: extras_final,
       observacoes: observacoes.trim(),
       ingredientes_indisponiveis: indisponiveisHoje,
     })
@@ -212,6 +157,8 @@ export default function ProductCustomizationModal({
     setAdicionarExpandido(false)
     setRetirarExpandido(false)
   }
+
+  if (!isOpen) return null
 
   return (
     <>
@@ -318,8 +265,8 @@ export default function ProductCustomizationModal({
           </div>
         )}
 
-        {/* Seção Adicionar - Expansível */}
-        {extrasComSubstituicao.length > 0 && (
+        {/* Seção Adicionar */}
+        {extrasAddList.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <button
               onClick={() => setAdicionarExpandido(!adicionarExpandido)}
@@ -331,14 +278,14 @@ export default function ProductCustomizationModal({
                 padding: 14,
                 border: '2px solid #27ae60',
                 borderRadius: 8,
-                background: adicionarExpandido ? '#f0fdf4' : '#fff',
+                background: adicionarExpandido ? '#f2fff6' : '#fff',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
                 marginBottom: adicionarExpandido ? 12 : 0,
               }}
               onMouseEnter={(e) => {
                 if (!adicionarExpandido) {
-                  e.currentTarget.style.background = '#f0fdf4'
+                  e.currentTarget.style.background = '#f2fff6'
                 }
               }}
               onMouseLeave={(e) => {
@@ -371,76 +318,77 @@ export default function ProductCustomizationModal({
                   </span>
                 )}
               </div>
-              <span
-                style={{
-                  fontSize: 18,
-                  color: '#27ae60',
-                  transform: adicionarExpandido ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease',
-                }}
-              >
-                ▼
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {totalExtrasAdicionados > 0 && (
+                  <span style={{ fontSize: 13, color: '#27ae60', fontWeight: 700 }}>
+                    + R$ {totalExtrasAdicionados.toFixed(2)}
+                  </span>
+                )}
+                <span
+                  style={{
+                    fontSize: 18,
+                    color: '#27ae60',
+                    transform: adicionarExpandido ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s ease',
+                  }}
+                >
+                  ▼
+                </span>
+              </div>
             </button>
 
             {adicionarExpandido && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
-                {extrasComSubstituicao.map((extra) => {
-                  const isSelected = extrasSelecionados.includes(extra.id)
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto', paddingRight: 4 }}>
+                {extrasAddList.map((extra) => {
+                  const checked = extrasSelecionados.includes(extra.id)
                   return (
                     <label
                       key={extra.id}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: 12,
-                        border: `2px solid ${isSelected ? '#27ae60' : '#e0e0e0'}`,
+                        gap: 10,
+                        padding: 10,
+                        border: `2px solid ${checked ? '#27ae60' : '#e0e0e0'}`,
                         borderRadius: 8,
                         cursor: 'pointer',
-                        background: isSelected ? '#f0fdf4' : '#fff',
+                        background: checked ? '#f2fff6' : '#fff',
                         transition: 'all 0.2s ease',
                       }}
                       onMouseEnter={(e) => {
-                        if (!isSelected) {
+                        if (!checked) {
                           e.currentTarget.style.borderColor = '#27ae60'
+                          e.currentTarget.style.background = '#f2fff6'
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (!isSelected) {
+                        if (!checked) {
                           e.currentTarget.style.borderColor = '#e0e0e0'
+                          e.currentTarget.style.background = '#fff'
                         }
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleExtra(extra.id)}
-                          style={{
-                            width: 20,
-                            height: 20,
-                            cursor: 'pointer',
-                          }}
-                        />
-                        <span style={{ fontSize: 15, fontWeight: 500 }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleExtra(extra.id)}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          cursor: 'pointer',
+                          accentColor: '#27ae60',
+                          flexShrink: 0,
+                        }}
+                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>
                           {extra.nome}
                         </span>
+                        <span style={{ fontSize: 13, color: '#27ae60', fontWeight: 700 }}>
+                          + R$ {extra.preco.toFixed(2)}
+                        </span>
                       </div>
-                      <span
-                        style={{
-                          fontSize: 15,
-                          fontWeight: 600,
-                          color:
-                            extrasGratisMap.has(extra.id) && isSelected
-                              ? '#f39c12'
-                              : '#27ae60',
-                        }}
-                      >
-                        {extrasGratisMap.has(extra.id) && isSelected
-                          ? 'Grátis'
-                          : `+ R$ ${extra.preco.toFixed(2)}`}
-                      </span>
+                      {checked && <span style={{ fontSize: 16, color: '#27ae60', fontWeight: 700 }}>✓</span>}
                     </label>
                   )
                 })}
