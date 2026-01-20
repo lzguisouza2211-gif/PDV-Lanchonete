@@ -10,6 +10,7 @@ export type ItemCardapio = {
   descricao?: string
   ingredientes?: string[]
   disponivel?: boolean
+  ingredientes_indisponiveis?: string[]
 }
 
 class CardapioService {
@@ -31,7 +32,9 @@ class CardapioService {
 
     console.log('📥 Cardápio carregado:', data?.length, 'itens')
 
-    // Parse ingredientes JSON se existir
+    const indisponiveisHoje = await this.listarIngredientesIndisponiveisHoje()
+
+    // Parse ingredientes JSON se existir e anexa indisponíveis do dia
     return (data || []).map((item: any) => ({
       ...item,
       id: String(item.id),
@@ -40,6 +43,7 @@ class CardapioService {
         : typeof item.ingredientes === 'string'
         ? JSON.parse(item.ingredientes || '[]')
         : item.ingredientes || [],
+      ingredientes_indisponiveis: indisponiveisHoje[String(item.id)] || [],
     })) as ItemCardapio[]
   }
 
@@ -59,7 +63,9 @@ class CardapioService {
 
     console.log('📥 Cardápio admin carregado:', data?.length, 'itens')
 
-    // Parse ingredientes JSON se existir
+    const indisponiveisHoje = await this.listarIngredientesIndisponiveisHoje()
+
+    // Parse ingredientes JSON se existir e anexa indisponíveis do dia
     return (data || []).map((item: any) => ({
       ...item,
       id: String(item.id),
@@ -68,6 +74,7 @@ class CardapioService {
         : typeof item.ingredientes === 'string'
         ? JSON.parse(item.ingredientes || '[]')
         : item.ingredientes || [],
+      ingredientes_indisponiveis: indisponiveisHoje[String(item.id)] || [],
     })) as ItemCardapio[]
   }
 
@@ -120,6 +127,69 @@ class CardapioService {
       .eq('id', id)
 
     if (error) {
+      throw error
+    }
+  }
+
+  async listarIngredientesIndisponiveisHoje(): Promise<Record<string, string[]>> {
+    const today = new Date().toISOString().slice(0, 10)
+    try {
+      const { data, error } = await supabase
+        .from('ingredientes_indisponiveis_dia')
+        .select('cardapio_id, ingrediente')
+        .eq('valid_on', today)
+
+      if (error) throw error
+
+      const mapa: Record<string, string[]> = {}
+      ;(data || []).forEach((row: any) => {
+        const key = String(row.cardapio_id)
+        if (!mapa[key]) mapa[key] = []
+        mapa[key].push(row.ingrediente)
+      })
+
+      return mapa
+    } catch (error: any) {
+      const msg = error?.message || ''
+      if (msg.includes("Could not find the table 'public.ingredientes_indisponiveis_dia'")) {
+        console.warn('⚠️ Migration 019 (ingredientes_indisponiveis_dia) não aplicada; ignorando ingredientes indisponíveis.')
+        return {}
+      }
+      console.error('❌ Erro ao buscar ingredientes indisponíveis:', msg)
+      return {}
+    }
+  }
+
+  async definirIngredienteIndisponivel(
+    cardapioId: string,
+    ingrediente: string,
+    indisponivel: boolean
+  ): Promise<void> {
+    const today = new Date().toISOString().slice(0, 10)
+    try {
+      if (indisponivel) {
+        const { error } = await supabase
+          .from('ingredientes_indisponiveis_dia')
+          .upsert({ cardapio_id: Number(cardapioId), ingrediente, valid_on: today })
+
+        if (error) throw error
+        return
+      }
+
+      const { error } = await supabase
+        .from('ingredientes_indisponiveis_dia')
+        .delete()
+        .eq('cardapio_id', Number(cardapioId))
+        .eq('ingrediente', ingrediente)
+        .eq('valid_on', today)
+
+      if (error) throw error
+    } catch (error: any) {
+      const msg = error?.message || ''
+      if (msg.includes("Could not find the table 'public.ingredientes_indisponiveis_dia'")) {
+        throw new Error('Tabela ingredientes_indisponiveis_dia não existe (rode migration 019 no Supabase).')
+      }
+      console.error('❌ Erro ao atualizar ingrediente indisponível:', msg)
       throw error
     }
   }

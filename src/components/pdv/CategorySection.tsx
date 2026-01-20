@@ -10,6 +10,7 @@ type CategorySectionProps = {
     preco: number
     descricao?: string
     ingredientes?: string[]
+    ingredientes_indisponiveis?: string[]
   }>
   onAddItem: (produto: any) => void
   lojaAberta: boolean
@@ -61,7 +62,9 @@ export default function CategorySection({
             nome={item.nome}
             preco={item.preco}
             descricao={item.descricao}
-            ingredientesIndisponiveis={ingredientesIndisponiveisMap[String(item.id)] || []}
+            ingredientesIndisponiveis={
+              item.ingredientes_indisponiveis || ingredientesIndisponiveisMap[String(item.id)] || []
+            }
             onAdd={() =>
               onAddItem({
                 id: item.id,
@@ -70,6 +73,8 @@ export default function CategorySection({
                 descricao: item.descricao,
                 ingredientes: item.ingredientes || [],
                 categoria: item.categoria,
+                ingredientes_indisponiveis:
+                  item.ingredientes_indisponiveis || ingredientesIndisponiveisMap[String(item.id)] || [],
               })
             }
             lojaAberta={lojaAberta}

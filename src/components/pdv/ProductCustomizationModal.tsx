@@ -93,10 +93,33 @@ export default function ProductCustomizationModal({
     [extrasAddList, extrasSelecionados]
   )
 
-  const totalExtrasAdicionados = useMemo(
-    () => extrasSelecionadosDetalhe.reduce((sum, extra) => sum + extra.preco, 0),
-    [extrasSelecionadosDetalhe]
-  )
+  const { priceById, totalExtrasAdicionados } = useMemo(() => {
+    const order = extrasSelecionados
+    let freeSlots = indisponiveisHoje.length
+    const priceMap: Record<string, number> = {}
+
+    order.forEach((id) => {
+      const extra = extrasAddList.find((e) => e.id === id)
+      if (!extra) return
+
+      const nome = (extra.nome || '').toLowerCase()
+      const isContraFile = /contra[- ]?file/.test(nome)
+
+      if (!isContraFile && freeSlots > 0) {
+        priceMap[id] = 0
+        freeSlots -= 1
+      } else {
+        priceMap[id] = extra.preco
+      }
+    })
+
+    const total = extrasSelecionadosDetalhe.reduce(
+      (sum, extra) => sum + (priceMap[extra.id] ?? extra.preco),
+      0
+    )
+
+    return { priceById: priceMap, totalExtrasAdicionados: total }
+  }, [extrasSelecionados, extrasSelecionadosDetalhe, extrasAddList, indisponiveisHoje.length])
 
   // Garantir que ingredientesRemoviveis seja array
   const ingredientesLista = Array.isArray(ingredientesRemoviveis) ? ingredientesRemoviveis : []
@@ -135,7 +158,10 @@ export default function ProductCustomizationModal({
     )
 
     const extras_final: ExtraOption[] = [
-      ...extrasSelecionadosDetalhe,
+      ...extrasSelecionadosDetalhe.map((extra) => ({
+        ...extra,
+        preco: priceById[extra.id] ?? extra.preco,
+      })),
       ...Array.from(removidosSet).map((nome) => ({
         id: `remove-${nome}`,
         nome,
@@ -261,6 +287,7 @@ export default function ProductCustomizationModal({
             </div>
             <div style={{ fontSize: 13, color: '#6b3b00', lineHeight: 1.4 }}>
               Você pode escolher outro ingrediente no lugar do que falta, sem custo adicional.
+              Adicionais pagos continuam com os valores mostrados abaixo.
             </div>
           </div>
         )}
@@ -341,6 +368,10 @@ export default function ProductCustomizationModal({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto', paddingRight: 4 }}>
                 {extrasAddList.map((extra) => {
                   const checked = extrasSelecionados.includes(extra.id)
+                  const nomeLower = extra.nome.toLowerCase()
+                  const isContraFile = /contra[- ]?file/.test(nomeLower)
+                  const adjustedPrice = priceById[extra.id] ?? extra.preco
+                  const isGratis = checked && adjustedPrice === 0 && !isContraFile
                   return (
                     <label
                       key={extra.id}
@@ -384,8 +415,8 @@ export default function ProductCustomizationModal({
                         <span style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>
                           {extra.nome}
                         </span>
-                        <span style={{ fontSize: 13, color: '#27ae60', fontWeight: 700 }}>
-                          + R$ {extra.preco.toFixed(2)}
+                        <span style={{ fontSize: 13, color: isGratis ? '#b35c00' : '#27ae60', fontWeight: 700 }}>
+                          {isGratis ? 'Grátis (substituição)' : `+ R$ ${adjustedPrice.toFixed(2)}`}
                         </span>
                       </div>
                       {checked && <span style={{ fontSize: 16, color: '#27ae60', fontWeight: 700 }}>✓</span>}

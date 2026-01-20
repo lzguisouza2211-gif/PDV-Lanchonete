@@ -35,7 +35,7 @@ export function useProdutosDisponibilidadeRealtime(
 
     // Tenta realtime
     let realtimeWorking = false
-    const channel = supabase
+    const channelProdutos = supabase
       .channel('pdv-produtos-disponibilidade-rt')
       .on(
         'postgres_changes',
@@ -57,9 +57,38 @@ export function useProdutosDisponibilidadeRealtime(
           try {
             const itens = await cardapioService.list()
             onUpdateRef.current(itens)
-            logger.info('✅ Cardápio sincronizado via realtime')
+            logger.info('✅ Cardápio sincronizado via realtime (produto)')
           } catch (err) {
             logger.error('Erro ao atualizar realtime de produtos:', err)
+          }
+        }
+      )
+      .subscribe()
+
+    const channelIngredientes = supabase
+      .channel('pdv-ingredientes-indisponiveis-rt')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ingredientes_indisponiveis_dia',
+        },
+        async (payload: any) => {
+          logger.info('📡 Evento realtime de ingredientes indisponíveis:', {
+            event: payload.eventType,
+            cardapio_id: payload.new?.cardapio_id || payload.old?.cardapio_id,
+            ingrediente: payload.new?.ingrediente || payload.old?.ingrediente,
+          })
+          realtimeWorking = true
+          setIsRealtime(true)
+
+          try {
+            const itens = await cardapioService.list()
+            onUpdateRef.current(itens)
+            logger.info('✅ Cardápio sincronizado via realtime (ingredientes)')
+          } catch (err) {
+            logger.error('Erro ao atualizar realtime de ingredientes:', err)
           }
         }
       )
@@ -91,7 +120,8 @@ export function useProdutosDisponibilidadeRealtime(
     return () => {
       clearInterval(pollInterval)
       clearTimeout(realtimeTimeout)
-      supabase.removeChannel(channel)
+      supabase.removeChannel(channelProdutos)
+      supabase.removeChannel(channelIngredientes)
     }
   }, [])
 
