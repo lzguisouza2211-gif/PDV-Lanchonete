@@ -136,6 +136,16 @@ export default function Cardapio(): JSX.Element {
     return map
   }, [itens])
 
+  const ingredientesIndisponiveisMap = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    itens.forEach((item: any) => {
+      if (Array.isArray(item.ingredientes_indisponiveis)) {
+        map[String(item.id)] = item.ingredientes_indisponiveis
+      }
+    })
+    return map
+  }, [itens])
+
   const listaCategorias = useMemo(() => {
     return ORDEM_CATEGORIAS.filter((cat) => categorias[cat])
   }, [categorias])
@@ -423,6 +433,7 @@ export default function Cardapio(): JSX.Element {
               onAddItem={handleAddItemClick}
               lojaAberta={lojaAberta}
               produtoAdicionado={produtoAdicionado}
+              ingredientesIndisponiveisMap={ingredientesIndisponiveisMap}
             />
           </div>
         ))}
@@ -667,7 +678,7 @@ export default function Cardapio(): JSX.Element {
           produto={produtoSelecionado}
           extrasDisponiveis={CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) ? extrasDisponiveis : []}
           ingredientesRemoviveis={CATEGORIAS_CUSTOMIZAVEIS.includes(produtoSelecionado.categoria) ? ingredientesRemoviveisDisponiveis : []}
-          ingredientesIndisponiveis={[]}
+          ingredientesIndisponiveis={produtoSelecionado.ingredientes_indisponiveis || []}
           onConfirm={handleConfirmCustomization}
           onClose={() => {
             setModalCustomizacaoAberto(false)

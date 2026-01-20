@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { cardapioService } from '../../services/api/cardapio.service';
-import { ingredientesService, Adicional, RetirarIngred } from '../../services/api/ingredientes.service';
 import { deliveryFeeService } from '../../services/api/deliveryFee.service';
 import './GestaoCardapio.css';
 
@@ -22,27 +21,25 @@ const ORDEM_CATEGORIAS = [
   'Omeletes',
   'Bebidas',
   'Cervejas',
-  'Doces',
+  'Sucos',
+  'Refrigerantes',
+  'Especiais',
+  'Combos',
 ];
+
+const CATEGORIAS_COM_INGREDIENTES = ['Lanches', 'Macarrão', 'Omeletes'];
 
 function GestaoCardapio() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string>('Todos');
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState('Todos');
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
   const [editingPriceValue, setEditingPriceValue] = useState('');
-  const [produtoSelecionadoIngredientes, setProdutoSelecionadoIngredientes] = useState<Produto | null>(null);
-  const [adicionais, setAdicionais] = useState<Adicional[]>([]);
-  const [retirar, setRetirar] = useState<RetirarIngred[]>([]);
-  const [novoAdicional, setNovoAdicional] = useState({ nome: '', preco: '' });
-  const [novoRetirar, setNovoRetirar] = useState('');
-  const [loadingIngredientes, setLoadingIngredientes] = useState(false);
-  
-  // Estados para taxa de entrega
+  const [ingredientesIndisponiveis, setIngredientesIndisponiveis] = useState<Record<number, string[]>>({});
   const [taxaEntrega, setTaxaEntrega] = useState(0);
+  const [novoValorTaxaEntrega, setNovoValorTaxaEntrega] = useState('0');
   const [editingTaxaEntrega, setEditingTaxaEntrega] = useState(false);
-  const [novoValorTaxaEntrega, setNovoValorTaxaEntrega] = useState('');
   const [savingTaxaEntrega, setSavingTaxaEntrega] = useState(false);
 
   useEffect(() => {
@@ -50,140 +47,129 @@ function GestaoCardapio() {
     fetchTaxaEntrega();
   }, []);
 
-  async function fetchTaxaEntrega() {
-    try {
-      const taxa = await deliveryFeeService.getDeliveryFee();
-      setTaxaEntrega(taxa);
-      setNovoValorTaxaEntrega(taxa.toFixed(2));
-    } catch (error) {
-      console.error('Erro ao buscar taxa de entrega:', error);
-    }
-  }
+  // Realtime para mudanças de ingredientes indisponíveis
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-ingredientes-indisponiveis-rt')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ingredientes_indisponiveis_dia',
+        },
+        () => {
+          fetchIngredientesIndisponiveis();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   async function fetchProdutos() {
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('cardapio')
-        .select('*')
-        .order('categoria', { ascending: true })
-        .order('nome', { ascending: true });
+        .select('id, nome, descricao, preco, categoria, disponivel, ingredientes');
 
       if (error) throw error;
-      
+
       const produtosData = (data || []) as Produto[];
       setProdutos(produtosData);
-    } catch (error) {
-      console.error('Erro ao buscar produtos:', error);
+      await fetchIngredientesIndisponiveis();
+    } catch (err) {
+      console.error('Erro ao buscar produtos:', err);
       alert('Erro ao carregar produtos');
     } finally {
       setLoading(false);
     }
   }
 
-  async function carregarIngredientes(produtoId: number) {
+  async function fetchTaxaEntrega() {
     try {
-      setLoadingIngredientes(true);
-      const [adicionaisData, retirarData] = await Promise.all([
-        ingredientesService.getAdicionaisAdminPorProduto(produtoId),
-        ingredientesService.getRetirarAdminPorProduto(produtoId),
-      ]);
-      setAdicionais(adicionaisData);
-      setRetirar(retirarData);
-    } catch (error) {
-      console.error('Erro ao carregar ingredientes:', error);
+      const fee = await deliveryFeeService.getDeliveryFee();
+      if (fee !== null && fee !== undefined) {
+        setTaxaEntrega(fee);
+        setNovoValorTaxaEntrega(fee.toFixed(2));
+      }
+    } catch (err) {
+      console.error('Erro ao buscar taxa de entrega:', err);
+    }
+  }
+
+  async function handleSaveTaxaEntrega() {
+    try {
+      const valor = parseFloat(novoValorTaxaEntrega.replace(',', '.'));
+      if (isNaN(valor) || valor < 0) {
+        alert('Valor inválido');
+        return;
+      }
+      setSavingTaxaEntrega(true);
+      await deliveryFeeService.updateDeliveryFee(valor);
+      setTaxaEntrega(valor);
+      setEditingTaxaEntrega(false);
+    } catch (err) {
+      console.error('Erro ao salvar taxa de entrega:', err);
+      alert('Erro ao salvar taxa de entrega');
     } finally {
-      setLoadingIngredientes(false);
+      setSavingTaxaEntrega(false);
     }
   }
 
-  async function abrirIngredientes(produto: Produto) {
-    setProdutoSelecionadoIngredientes(produto);
-    await carregarIngredientes(produto.id);
+  async function fetchIngredientesIndisponiveis() {
+    try {
+      const mapa = await cardapioService.listarIngredientesIndisponiveisHoje();
+      const convertida: Record<number, string[]> = {};
+      Object.entries(mapa).forEach(([key, lista]) => {
+        convertida[Number(key)] = lista;
+      });
+      setIngredientesIndisponiveis(convertida);
+    } catch (err) {
+      console.error('Erro ao buscar ingredientes indisponíveis:', err);
+    }
   }
 
-  async function adicionarNovoAdicional() {
-    if (!produtoSelecionadoIngredientes || !novoAdicional.nome || !novoAdicional.preco) {
-      alert('Preencha nome e preço');
-      return;
-    }
+  function extrairIngredientes(descricao: string): string[] {
+    if (!descricao) return [];
+    const texto = descricao.replace(/\n/g, ' ');
+    const partes = texto.split(/,|\/| e /i).map((p) => p.trim()).filter(Boolean);
+    return Array.from(new Set(partes));
+  }
+
+  async function toggleIngredienteDisponibilidade(produtoId: number, ingrediente: string) {
+    const indisponiveisProduto = ingredientesIndisponiveis[produtoId] || [];
+    const jaIndisponivel = indisponiveisProduto.includes(ingrediente);
 
     try {
-      const resultado = await ingredientesService.criarAdicional(
-        produtoSelecionadoIngredientes.id,
-        novoAdicional.nome,
-        parseFloat(novoAdicional.preco)
+      setIngredientesIndisponiveis((prev) => ({
+        ...prev,
+        [produtoId]: jaIndisponivel
+          ? prev[produtoId]?.filter((ing) => ing !== ingrediente) || []
+          : [...(prev[produtoId] || []), ingrediente],
+      }));
+
+      await cardapioService.definirIngredienteIndisponivel(
+        String(produtoId),
+        ingrediente,
+        !jaIndisponivel,
       );
-      if (resultado) {
-        setAdicionais([...adicionais, resultado]);
-        setNovoAdicional({ nome: '', preco: '' });
+    } catch (err: any) {
+      console.error('Erro ao atualizar ingrediente:', err);
+      await fetchIngredientesIndisponiveis();
+      const msg = err?.message || '';
+      if (msg.includes('ingredientes_indisponiveis_dia')) {
+        alert('Tabela ingredientes_indisponiveis_dia não existe. Rode a migration 019 no Supabase.');
+      } else {
+        alert('Erro ao atualizar ingrediente');
       }
-    } catch (error) {
-      console.error('Erro ao adicionar:', error);
-      alert('Erro ao adicionar');
     }
   }
 
-  async function adicionarNovoRetirar() {
-    if (!produtoSelecionadoIngredientes || !novoRetirar) {
-      alert('Digite o nome do ingrediente');
-      return;
-    }
-
-    try {
-      const resultado = await ingredientesService.criarRetirar(
-        produtoSelecionadoIngredientes.id,
-        novoRetirar
-      );
-      if (resultado) {
-        setRetirar([...retirar, resultado]);
-        setNovoRetirar('');
-      }
-    } catch (error) {
-      console.error('Erro ao adicionar:', error);
-      alert('Erro ao adicionar');
-    }
-  }
-
-  async function toggleAtivoAdicional(id: number, ativo: boolean) {
-    try {
-      await ingredientesService.atualizarAdicional(id, { ativo: !ativo });
-      setAdicionais(adicionais.map(a => a.id === id ? { ...a, ativo: !ativo } : a));
-    } catch (error) {
-      console.error('Erro ao atualizar:', error);
-    }
-  }
-
-  async function toggleAtivoRetirar(id: number, ativo: boolean) {
-    try {
-      await ingredientesService.atualizarRetirar(id, { ativo: !ativo });
-      setRetirar(retirar.map(r => r.id === id ? { ...r, ativo: !ativo } : r));
-    } catch (error) {
-      console.error('Erro ao atualizar:', error);
-    }
-  }
-
-  async function excluirAdicional(id: number) {
-    if (!window.confirm('Deseja excluir este ingrediente?')) return;
-    try {
-      await ingredientesService.excluirAdicional(id);
-      setAdicionais(adicionais.filter(a => a.id !== id));
-    } catch (error) {
-      console.error('Erro ao excluir:', error);
-    }
-  }
-
-  async function excluirRetirar(id: number) {
-    if (!window.confirm('Deseja excluir este ingrediente?')) return;
-    try {
-      await ingredientesService.excluirRetirar(id);
-      setRetirar(retirar.filter(r => r.id !== id));
-    } catch (error) {
-      console.error('Erro ao excluir:', error);
-    }
-  }
-
-  const handleToggleDisponibilidade = async (id: number, disponivel: boolean) => {
+  async function handleToggleDisponibilidade(id: number, disponivel: boolean) {
     try {
       const { error } = await supabase
         .from('cardapio')
@@ -191,284 +177,150 @@ function GestaoCardapio() {
         .eq('id', id);
 
       if (error) throw error;
-      
-      setProdutos(produtos.map(p => 
-        p.id === id ? { ...p, disponivel } : p
-      ));
-    } catch (error) {
-      console.error('Erro ao atualizar disponibilidade:', error);
+
+      setProdutos((prev) => prev.map((p) => (p.id === id ? { ...p, disponivel } : p)));
+    } catch (err) {
+      console.error('Erro ao atualizar disponibilidade:', err);
       alert('Erro ao atualizar');
     }
-  };
+  }
 
-  const handleSavePrice = async (id: number) => {
+  async function handleSavePrice(id: number) {
+    const novoPreco = parseFloat(editingPriceValue.replace(',', '.'));
+    if (isNaN(novoPreco) || novoPreco <= 0) {
+      alert('Preço inválido');
+      return;
+    }
+
     try {
-      const novoPreco = parseFloat(editingPriceValue);
-      if (isNaN(novoPreco) || novoPreco <= 0) {
-        alert('Preço inválido');
-        return;
-      }
-
       const { error } = await supabase
         .from('cardapio')
         .update({ preco: novoPreco })
         .eq('id', id);
 
       if (error) throw error;
-      
-      setProdutos(produtos.map(p => 
-        p.id === id ? { ...p, preco: novoPreco } : p
-      ));
+
+      setProdutos((prev) => prev.map((p) => (p.id === id ? { ...p, preco: novoPreco } : p)));
       setEditingPriceId(null);
-    } catch (error) {
-      console.error('Erro ao atualizar preço:', error);
-      alert('Erro ao atualizar preço');
-    }
-  };
-
-  // Extrai ingredientes da descrição
-  const extrairIngredientes = (descricao: string): string[] => {
-    if (!descricao) return [];
-    // Divide por vírgula e limpa espaços
-    return descricao
-      .split(',')
-      .map(ing => ing.trim())
-      .filter(ing => ing.length > 0);
-  };
-
-  // Função para salvar taxa de entrega
-  async function handleSaveTaxaEntrega() {
-    try {
-      const novoValor = parseFloat(novoValorTaxaEntrega);
-      if (isNaN(novoValor) || novoValor < 0) {
-        alert('Valor inválido. Digite um número maior ou igual a 0');
-        return;
-      }
-
-      setSavingTaxaEntrega(true);
-      const sucesso = await deliveryFeeService.updateDeliveryFee(novoValor);
-      
-      if (sucesso) {
-        setTaxaEntrega(novoValor);
-        setEditingTaxaEntrega(false);
-        alert('✓ Taxa de entrega atualizada com sucesso!');
-      } else {
-        alert('Erro ao atualizar taxa de entrega');
-      }
-    } catch (error) {
-      console.error('Erro ao salvar taxa de entrega:', error);
-      alert('Erro ao atualizar taxa de entrega');
-    } finally {
-      setSavingTaxaEntrega(false);
+    } catch (err) {
+      console.error('Erro ao salvar preço:', err);
+      alert('Erro ao salvar preço');
     }
   }
 
-  const categoriasOrdenadas = React.useMemo(() => {
-    const categoriasUnicas = Array.from(new Set(produtos.map(p => p.categoria)));
-    const ordenadas = ORDEM_CATEGORIAS.filter(cat => categoriasUnicas.includes(cat));
-    const restantes = categoriasUnicas.filter(cat => !ORDEM_CATEGORIAS.includes(cat));
+  const categoriasOrdenadas = useMemo(() => {
+    const existentes = Array.from(new Set(produtos.map((p) => p.categoria)));
+    const ordenadas = ORDEM_CATEGORIAS.filter((c) => existentes.includes(c));
+    const restantes = existentes.filter((c) => !ORDEM_CATEGORIAS.includes(c)).sort();
     return ['Todos', ...ordenadas, ...restantes];
   }, [produtos]);
 
-  const produtosFiltrados = produtos.filter(produto => {
-    const matchesCategoria = categoriaSelecionada === 'Todos' || produto.categoria === categoriaSelecionada;
-    const matchesSearch = searchTerm === '' || 
-                         produto.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         produto.descricao?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCategoria && matchesSearch;
-  });
-
-  const produtosCategoria = categoriaSelecionada === 'Todos' 
-    ? produtos 
-    : produtos.filter(p => p.categoria === categoriaSelecionada);
-  const disponiveis = produtosCategoria.filter(p => p.disponivel).length;
-
-  if (loading) {
-    return (
-      <div className="admin-container">
-        <main className="admin-main">
-          <div style={{ padding: '2rem', textAlign: 'center' }}>
-            <p style={{ fontSize: '1.1rem', color: '#666' }}>Carregando...</p>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  const produtosFiltrados = useMemo(() => {
+    return produtos.filter((produto) => {
+      const matchCategoria =
+        categoriaSelecionada === 'Todos' || produto.categoria === categoriaSelecionada;
+      const termo = searchTerm.toLowerCase();
+      const matchTexto =
+        produto.nome.toLowerCase().includes(termo) || produto.descricao?.toLowerCase().includes(termo);
+      return matchCategoria && matchTexto;
+    });
+  }, [produtos, categoriaSelecionada, searchTerm]);
 
   return (
-    <div className="admin-container">
-      <main className="admin-main gestao-layout">
-        <section className="gestao-main">
-          {/* Header */}
-          <div className="gestao-header">
-            <div>
-              <h1 className="gestao-title">{categoriaSelecionada}</h1>
-              <p className="gestao-subtitle">
-                {disponiveis} de {produtosCategoria.length} produtos disponíveis
-              </p>
-            </div>
-
-            <div className="gestao-header-actions">
-              {/* Taxa de Entrega */}
-              <div style={{
-                padding: '16px',
-                backgroundColor: '#e8f4f8',
-                borderRadius: '10px',
-                border: '2px solid #3498db',
-                minWidth: '200px'
-              }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  color: '#2c3e50',
-                  marginBottom: '8px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  🚚 Taxa de Entrega
-                </label>
-                {editingTaxaEntrega ? (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={novoValorTaxaEntrega}
-                      onChange={(e) => setNovoValorTaxaEntrega(e.target.value)}
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid #3498db',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                      }}
-                      placeholder="0.00"
-                      disabled={savingTaxaEntrega}
-                    />
-                    <button
-                      onClick={handleSaveTaxaEntrega}
-                      disabled={savingTaxaEntrega}
-                      style={{
-                        padding: '8px 12px',
-                        backgroundColor: '#27ae60',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: savingTaxaEntrega ? 'not-allowed' : 'pointer',
-                        fontWeight: '600',
-                        fontSize: '13px',
-                        opacity: savingTaxaEntrega ? 0.6 : 1,
-                      }}
-                    >
-                      {savingTaxaEntrega ? '...' : '✓'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingTaxaEntrega(false);
-                        setNovoValorTaxaEntrega(taxaEntrega.toFixed(2));
-                      }}
-                      disabled={savingTaxaEntrega}
-                      style={{
-                        padding: '8px 12px',
-                        backgroundColor: '#e74c3c',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                        fontSize: '13px',
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => {
-                      setEditingTaxaEntrega(true);
-                      setNovoValorTaxaEntrega(taxaEntrega.toFixed(2));
-                    }}
-                    style={{
-                      fontSize: '24px',
-                      fontWeight: '700',
-                      color: '#3498db',
-                      cursor: 'pointer',
-                      padding: '8px 12px',
-                      backgroundColor: '#ffffff',
-                      borderRadius: '6px',
-                      border: '2px dashed #3498db',
-                      textAlign: 'center',
-                      transition: 'all 0.2s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#d5eef7';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#ffffff';
-                    }}
-                  >
-                    R$ {taxaEntrega.toFixed(2)}
-                  </div>
-                )}
-              </div>
-
-              <div className="gestao-categoria-select-wrapper">
-                <label className="gestao-categoria-label">Categoria</label>
-                <select
-                  value={categoriaSelecionada}
-                  onChange={(e) => setCategoriaSelecionada(e.target.value)}
-                  className="gestao-categoria-select"
-                >
-                  {categoriasOrdenadas.map(cat => {
-                    if (cat === 'Todos') {
-                      const total = produtos.length;
-                      const dispo = produtos.filter(p => p.disponivel).length;
-                      return (
-                        <option key={cat} value={cat}>
-                          Todos ({dispo}/{total})
-                        </option>
-                      );
-                    }
-                    const total = produtos.filter(p => p.categoria === cat).length;
-                    const dispo = produtos.filter(p => p.categoria === cat && p.disponivel).length;
-                    return (
-                      <option key={cat} value={cat}>
-                        {cat} ({dispo}/{total})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-              
-              <div className="gestao-search">
+    <div className="gestao-container">
+      <header className="gestao-header">
+        <div>
+          <p className="gestao-subtitle">Administração</p>
+          <h1 className="gestao-title">Gestão de Cardápio</h1>
+        </div>
+        <div className="gestao-actions">
+          <div className="gestao-fee-card">
+            <div className="fee-label">Taxa de entrega</div>
+            {editingTaxaEntrega ? (
+              <div className="fee-edit">
                 <input
-                  type="text"
-                  placeholder="Buscar produto..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="search-input"
+                  type="number"
+                  step="0.01"
+                  value={novoValorTaxaEntrega}
+                  onChange={(e) => setNovoValorTaxaEntrega(e.target.value)}
+                  disabled={savingTaxaEntrega}
                 />
+                <button onClick={handleSaveTaxaEntrega} disabled={savingTaxaEntrega}>
+                  {savingTaxaEntrega ? '...' : 'Salvar'}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingTaxaEntrega(false);
+                    setNovoValorTaxaEntrega(taxaEntrega.toFixed(2));
+                  }}
+                  disabled={savingTaxaEntrega}
+                >
+                  Cancelar
+                </button>
               </div>
-            </div>
+            ) : (
+              <div className="fee-display" onClick={() => setEditingTaxaEntrega(true)}>
+                R$ {taxaEntrega.toFixed(2)}
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="gestao-main">
+        <section className="gestao-filtros">
+          <div className="gestao-categoria-select-wrapper">
+            <label className="gestao-categoria-label">Categoria</label>
+            <select
+              value={categoriaSelecionada}
+              onChange={(e) => setCategoriaSelecionada(e.target.value)}
+              className="gestao-categoria-select"
+            >
+              {categoriasOrdenadas.map((cat) => {
+                const total = cat === 'Todos'
+                  ? produtos.length
+                  : produtos.filter((p) => p.categoria === cat).length;
+                const dispo = cat === 'Todos'
+                  ? produtos.filter((p) => p.disponivel).length
+                  : produtos.filter((p) => p.categoria === cat && p.disponivel).length;
+                return (
+                  <option key={cat} value={cat}>
+                    {cat} ({dispo}/{total})
+                  </option>
+                );
+              })}
+            </select>
           </div>
 
-          {/* Produtos Grid */}
-          {produtosFiltrados.length === 0 ? (
-            <div className="gestao-empty">
-              <p>Nenhum produto encontrado</p>
-            </div>
-          ) : (
-            <div className="gestao-grid">
-              {produtosFiltrados.map(produto => (
+          <div className="gestao-search">
+            <input
+              type="text"
+              placeholder="Buscar produto..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </section>
+
+        {loading ? (
+          <div className="gestao-empty">Carregando...</div>
+        ) : produtosFiltrados.length === 0 ? (
+          <div className="gestao-empty">Nenhum produto encontrado</div>
+        ) : (
+          <div className="gestao-grid">
+            {produtosFiltrados.map((produto) => {
+              const ingredientes = Array.isArray(produto.ingredientes) && produto.ingredientes.length > 0
+                ? produto.ingredientes
+                : extrairIngredientes(produto.descricao);
+              return (
                 <div key={produto.id} className="gestao-card">
-                  {/* Nome */}
                   <div className="card-header">
                     <h4 className="card-nome">{produto.nome}</h4>
+                    <span className="card-categoria">{produto.categoria}</span>
                   </div>
 
-                  {/* Preço */}
+                  <p className="card-descricao">{produto.descricao}</p>
+
                   <div className="card-preco-section">
                     {editingPriceId === produto.id ? (
                       <div className="preco-edit">
@@ -480,21 +332,15 @@ function GestaoCardapio() {
                           className="preco-input"
                           autoFocus
                         />
-                        <button 
-                          onClick={() => handleSavePrice(produto.id)}
-                          className="preco-btn-save"
-                        >
+                        <button onClick={() => handleSavePrice(produto.id)} className="preco-btn-save">
                           ✓
                         </button>
-                        <button 
-                          onClick={() => setEditingPriceId(null)}
-                          className="preco-btn-cancel"
-                        >
+                        <button onClick={() => setEditingPriceId(null)} className="preco-btn-cancel">
                           ✕
                         </button>
                       </div>
                     ) : (
-                      <div 
+                      <div
                         className="preco-display"
                         onClick={() => {
                           setEditingPriceId(produto.id);
@@ -507,7 +353,6 @@ function GestaoCardapio() {
                     )}
                   </div>
 
-                  {/* Status Buttons */}
                   <div className="card-status">
                     <button
                       className={`status-btn-verde ${produto.disponivel ? 'ativo' : ''}`}
@@ -523,133 +368,31 @@ function GestaoCardapio() {
                     </button>
                   </div>
 
-                  {/* Botão Ingredientes */}
-                  {['Lanches', 'Macarrão', 'Omeletes'].includes(produto.categoria) && (
-                    <div style={{ marginTop: '12px' }}>
-                      <button
-                        onClick={() => abrirIngredientes(produto)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          backgroundColor: '#3498db',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        🥘 Editar ingredientes
-                      </button>
+                  {CATEGORIAS_COM_INGREDIENTES.includes(produto.categoria) && ingredientes.length > 0 && (
+                    <div className="card-ingredientes-inline">
+                      <div className="ingredientes-label">Ingredientes</div>
+                      <div className="ingredientes-buttons">
+                        {ingredientes.map((ing) => {
+                          const indispo = (ingredientesIndisponiveis[produto.id] || []).includes(ing);
+                          return (
+                            <button
+                              key={ing}
+                              className={`ingrediente-badge ${indispo ? 'indisponivel' : 'disponivel'}`}
+                              onClick={() => toggleIngredienteDisponibilidade(produto.id, ing)}
+                            >
+                              <span className="badge-icon">{indispo ? '✕' : '✓'}</span> {ing}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </main>
-
-      {/* Modal de Ingredientes */}
-      {produtoSelecionadoIngredientes && (
-        <div className="gestao-modal-overlay" onClick={() => setProdutoSelecionadoIngredientes(null)}>
-          <div className="gestao-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="gestao-modal-header">
-              <h3>Ingredientes - {produtoSelecionadoIngredientes.nome}</h3>
-              <button className="modal-close" onClick={() => setProdutoSelecionadoIngredientes(null)}>
-                ✕
-              </button>
-            </div>
-
-            {loadingIngredientes ? (
-              <p style={{ padding: '12px' }}>Carregando ingredientes...</p>
-            ) : (
-              <div className="ingredientes-grid">
-                <div className="ingredientes-col">
-                  <h4>Adicionáveis</h4>
-                  <div className="ingredientes-list">
-                    {adicionais.map((item) => (
-                      <div key={item.id} className="ingrediente-row">
-                        <div>
-                          <div className="ingrediente-nome">{item.nome}</div>
-                          <div className="ingrediente-preco">R$ {item.preco.toFixed(2)}</div>
-                        </div>
-                        <div className="ingrediente-actions">
-                          <label className="switch">
-                            <input
-                              type="checkbox"
-                              checked={item.ativo}
-                              onChange={() => toggleAtivoAdicional(item.id, item.ativo)}
-                            />
-                            <span className="slider" />
-                          </label>
-                          <button className="btn-danger" onClick={() => excluirAdicional(item.id)}>
-                            Excluir
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {adicionais.length === 0 && <p className="ingredientes-empty">Nenhum adicional</p>}
-                  </div>
-
-                  <div className="ingrediente-form">
-                    <input
-                      type="text"
-                      placeholder="Nome do adicional"
-                      value={novoAdicional.nome}
-                      onChange={(e) => setNovoAdicional({ ...novoAdicional, nome: e.target.value })}
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Preço"
-                      value={novoAdicional.preco}
-                      onChange={(e) => setNovoAdicional({ ...novoAdicional, preco: e.target.value })}
-                    />
-                    <button className="btn-primary" onClick={adicionarNovoAdicional}>Adicionar</button>
-                  </div>
-                </div>
-
-                <div className="ingredientes-col">
-                  <h4>Removíveis</h4>
-                  <div className="ingredientes-list">
-                    {retirar.map((item) => (
-                      <div key={item.id} className="ingrediente-row">
-                        <div className="ingrediente-nome">{item.nome}</div>
-                        <div className="ingrediente-actions">
-                          <label className="switch">
-                            <input
-                              type="checkbox"
-                              checked={item.ativo}
-                              onChange={() => toggleAtivoRetirar(item.id, item.ativo)}
-                            />
-                            <span className="slider" />
-                          </label>
-                          <button className="btn-danger" onClick={() => excluirRetirar(item.id)}>
-                            Excluir
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {retirar.length === 0 && <p className="ingredientes-empty">Nenhum removível</p>}
-                  </div>
-
-                  <div className="ingrediente-form">
-                    <input
-                      type="text"
-                      placeholder="Nome do ingrediente"
-                      value={novoRetirar}
-                      onChange={(e) => setNovoRetirar(e.target.value)}
-                    />
-                    <button className="btn-primary" onClick={adicionarNovoRetirar}>Adicionar</button>
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            })}
           </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   );
 }

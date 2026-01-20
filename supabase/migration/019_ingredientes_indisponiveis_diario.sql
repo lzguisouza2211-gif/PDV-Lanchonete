@@ -15,21 +15,18 @@ create unique index ingredientes_indisponiveis_dia_unique
 -- Habilitar RLS
 alter table ingredientes_indisponiveis_dia enable row level security;
 
--- SELECT liberado para todos (PDV precisa saber o que está indisponível no dia)
-create policy if not exists public_select_ingredientes_indisponiveis
+-- Policies (Postgres não suporta "if not exists" para policy)
+drop policy if exists public_select_ingredientes_indisponiveis on ingredientes_indisponiveis_dia;
+create policy public_select_ingredientes_indisponiveis
 on ingredientes_indisponiveis_dia
 for select
 using (true);
 
--- INSERT / DELETE / UPDATE apenas para admins (operador = admin)
-create policy if not exists admin_manage_ingredientes_indisponiveis
+drop policy if exists admin_manage_ingredientes_indisponiveis on ingredientes_indisponiveis_dia;
+create policy admin_manage_ingredientes_indisponiveis
 on ingredientes_indisponiveis_dia
 for all
-using (
-  auth.uid() in (select user_id from admins where ativo = true)
-)
-with check (
-  auth.uid() in (select user_id from admins where ativo = true)
-);
+using (auth.uid() in (select user_id from admins where ativo = true))
+with check (auth.uid() in (select user_id from admins where ativo = true));
 
 comment on table ingredientes_indisponiveis_dia is 'Ingredientes marcados como indisponíveis por dia para cada produto';
