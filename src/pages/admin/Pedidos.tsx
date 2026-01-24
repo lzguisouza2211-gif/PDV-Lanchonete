@@ -175,34 +175,96 @@ export default function PedidosAdmin() {
     [pedidos, updatePedido, atualizarStatus]
   )
 
+  const formatEndereco = (pedido: any) => {
+    const endereco = (pedido.endereco || '').trim()
+    const numero = (pedido.numero || '').trim()
+    const bairro = (pedido.bairro || '').trim()
+
+    const novoFormato = endereco
+      ? `${endereco}${numero ? `, ${numero}` : ''}${bairro ? ` - ${bairro}` : ''}`
+      : ''
+
+    return novoFormato
+  }
+
   // Memoizar lista de pedidos para evitar re-renders desnecessários
   const pedidosRenderizados = useMemo(() => {
-    return pedidos.map((pedido: any) => (
-      <div
-        key={pedido.id}
-        style={{
-          padding: 16,
-          borderRadius: 12,
-          border: '1px solid #ddd',
-          background: '#fff',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <strong>{pedido.cliente}</strong>
-          <span style={{ fontWeight: 600 }}>{pedido.status}</span>
+    return pedidos.map((pedido: any) => {
+      const endereco = formatEndereco(pedido)
+
+      return (
+        <div
+          key={pedido.id}
+          style={{
+            padding: 16,
+            borderRadius: 12,
+            border: '1px solid #ddd',
+            background: '#fff',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <strong>{pedido.cliente}</strong>
+            <span style={{ fontWeight: 600 }}>{pedido.status}</span>
+          </div>
+
+          <p style={{ margin: '8px 0' }}>
+            💰 Total: <strong>R$ {Number(pedido.total).toFixed(2)}</strong>
+          </p>
+
+          <p style={{ fontSize: 14, color: '#666' }}>
+            Tipo: {pedido.tipoentrega || '—'}
+          </p>
+
+          {pedido.phone && (
+            <p style={{ fontSize: 14, color: '#2c3e50', fontWeight: 500 }}>
+              📱 {pedido.phone}
+            </p>
+          )}
+
+          {endereco && (
+            <p style={{ fontSize: 14 }}>📍 {endereco}</p>
+          )}
+
+        {/* Campo Tempo de Preparo */}
+        <div style={{ marginTop: 12, padding: '8px', borderRadius: 6, backgroundColor: '#f0f0f0' }}>
+          <label style={{ fontSize: 13, display: 'block', marginBottom: 6, fontWeight: 600 }}>
+            ⏱️ Tempo de Preparo (minutos):
+          </label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="number"
+              min="1"
+              step="5"
+              value={pedido.tempo_preparo || 40}
+              onChange={(e) => {
+                const novoTempo = parseInt(e.target.value)
+                setPedidos(prev => prev.map(p => p.id === pedido.id ? { ...p, tempo_preparo: novoTempo } : p))
+              }}
+              style={{
+                padding: '6px 8px',
+                borderRadius: 4,
+                border: '1px solid #ddd',
+                width: '80px',
+                fontSize: 14,
+              }}
+            />
+            <button
+              onClick={() => atualizarStatus(pedido.id, pedido.status || 'Recebido', pedido.tempo_preparo || 40)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 4,
+                border: 'none',
+                background: '#3498db',
+                color: '#fff',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              💾 Salvar
+            </button>
+          </div>
         </div>
-
-        <p style={{ margin: '8px 0' }}>
-          💰 Total: <strong>R$ {Number(pedido.total).toFixed(2)}</strong>
-        </p>
-
-        <p style={{ fontSize: 14, color: '#666' }}>
-          Tipo: {pedido.tipoentrega || '—'}
-        </p>
-
-        {pedido.endereco && (
-          <p style={{ fontSize: 14 }}>📍 {pedido.endereco}</p>
-        )}
 
         {/* Itens do pedido */}
         {pedido.itens && Array.isArray(pedido.itens) && pedido.itens.length > 0 && (

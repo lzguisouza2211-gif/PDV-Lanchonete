@@ -14,8 +14,8 @@ export default function Dashboard() {
   const [tempoEsperaDia, setTempoEsperaDia] = useState<number>(40)
   const [savingTempo, setSavingTempo] = useState(false)
   const [mostrarSucesso, setMostrarSucesso] = useState(false)
-
   const [editingTempo, setEditingTempo] = useState(false)
+
   useEffect(() => {
     const load = async () => {
       const data = await listPedidos()
@@ -23,7 +23,7 @@ export default function Dashboard() {
       
       // Busca tempo de espera do dia
       const status = await storeStatusService.getStatus()
-      if (status?.tempo_espera_padrao && !editingTempo) {
+      if (status?.tempo_espera_padrao) {
         setTempoEsperaDia(status.tempo_espera_padrao)
       }
     }

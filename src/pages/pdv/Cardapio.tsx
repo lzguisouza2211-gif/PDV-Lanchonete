@@ -13,6 +13,7 @@ import ProductCustomizationModal, {
 import CustomizationPrompt from '../../components/pdv/CustomizationPrompt'
 
 import { cardapioService } from '../../services/api/cardapio.service'
+import { storeStatusService } from '../../services/storeStatus'
 import PixKeyDisplay from '../../components/pdv/PixKeyDisplay'
 import { PIX_CONFIG } from '../../config/pix'
 import { useProdutosDisponibilidadeRealtime } from '../../hooks/useProdutosDisponibilidadeRealtime'
@@ -67,12 +68,15 @@ export default function Cardapio(): JSX.Element {
   const { items, add, remove, criarPedido } = useCartWithPedidos()
   const { isOpen: lojaAberta, loading: statusLoading } = useStoreStatus()
   const { taxaEntrega } = useDeliveryFee()
+  const [tempoEsperaDia, setTempoEsperaDia] = useState<number>(40)
 
   const [nome, setNome] = useState('')
     const [telefone, setTelefone] = useState('')
   const [tipoEntrega, setTipoEntrega] =
     useState<'retirada' | 'entrega' | 'local'>('retirada')
   const [endereco, setEndereco] = useState('')
+  const [numero, setNumero] = useState('')
+  const [bairro, setBairro] = useState('')
   const [formaPagamento, setFormaPagamento] =
     useState<'dinheiro' | 'cartao' | 'pix'>('dinheiro')
   const [troco, setTroco] = useState('')
@@ -112,6 +116,32 @@ export default function Cardapio(): JSX.Element {
   useEffect(() => {
     setItens(itensCardapio)
   }, [itensCardapio])
+
+  // Busca tempo de espera do dia
+  useEffect(() => {
+    const loadTempo = async () => {
+      const status = await storeStatusService.getStatus()
+      if (status?.tempo_espera_padrao) {
+        setTempoEsperaDia(status.tempo_espera_padrao)
+      }
+    }
+    loadTempo()
+  }, [])
+
+  // Polling de 2s para atualizar tempo de espera do dia
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const status = await storeStatusService.getStatus()
+        if (status?.tempo_espera_padrao) {
+          setTempoEsperaDia(status.tempo_espera_padrao)
+        }
+      } catch (e) {
+        // ignora erros
+      }
+    }, 2000)
+    return () => clearInterval(id)
+  }, [])
 
   const ORDEM_CATEGORIAS = [
     'Lanches',
@@ -272,22 +302,30 @@ export default function Cardapio(): JSX.Element {
     enviandoRef.current = true
     setEnviando(true)
     setErro(null)
-      // Validações
+    try {
       if (!nome.trim()) {
         throw new Error('Nome é obrigatório')
       }
-      
+
       if (!validarTelefoneBrasileiro(telefone)) {
         throw new Error('Telefone inválido. Use o formato: (XX) XXXXX-XXXX')
       }
 
 
-    try {
+      if (tipoEntrega === 'entrega') {
+        if (!endereco.trim() || !numero.trim() || !bairro.trim()) {
+          throw new Error('Preencha rua, número e bairro para entrega')
+        }
+      }
+
+
       await criarPedido({
         cliente: nome,
-          telefone,
+        phone: telefone,
         tipoEntrega,
         endereco: tipoEntrega === 'entrega' ? endereco : undefined,
+        numero: tipoEntrega === 'entrega' ? numero : undefined,
+        bairro: tipoEntrega === 'entrega' ? bairro : undefined,
         formaPagamento,
         troco: formaPagamento === 'dinheiro' ? troco : undefined,
         taxaEntrega: tipoEntrega === 'entrega' ? taxaEntrega : 0,
@@ -299,6 +337,8 @@ export default function Cardapio(): JSX.Element {
       setNome('')
       setTelefone('')
       setEndereco('')
+      setNumero('')
+      setBairro('')
       setTroco('')
     } catch (e: any) {
       setErro(e.message || 'Erro ao enviar pedido')
@@ -339,13 +379,51 @@ export default function Cardapio(): JSX.Element {
           <span style={{ fontSize: 22 }}>🍔</span>
           <span>Luizão Lanches</span>
         </div>
-        <span style={{ fontSize: 14, fontWeight: 500 }}>
-          {statusLoading
-            ? 'Carregando...'
-            : lojaAberta
-            ? 'Estamos abertos! 🟢'
-            : 'Fechado no momento 🔴'}
-        </span>
+        <div style={{ textAlign: 'right' }}>
+          {statusLoading ? (
+            <span style={{ fontSize: 12, color: '#fff' }}>Carregando...</span>
+          ) : (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 12,
+                fontWeight: 700,
+                color: lojaAberta ? '#166534' : '#991b1b',
+                background: lojaAberta ? '#dcfce7' : '#fee2e2',
+                border: '1px solid',
+                borderColor: lojaAberta ? '#86efac' : '#fecaca',
+                padding: '4px 10px',
+                borderRadius: 16,
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: lojaAberta ? '#22c55e' : '#ef4444',
+                  display: 'inline-block',
+                }}
+              />
+              {lojaAberta ? 'Aberto' : 'Fechado'}
+            </span>
+          )}
+          <span style={{ 
+            fontSize: 12, 
+            color: '#fff',
+            fontWeight: 700,
+            marginTop: 4,
+            display: 'inline-block',
+            background: 'rgba(255,255,255,0.2)',
+            padding: '4px 10px',
+            borderRadius: 16,
+            border: '1px solid rgba(255,255,255,0.4)',
+          }}>
+            ⏱️ {tempoEsperaDia}min
+          </span>
+        </div>
       </header> 
       {/* DROPDOWN FIXO DE CATEGORIAS */}
       {!loading && !error && (
@@ -543,21 +621,60 @@ export default function Cardapio(): JSX.Element {
           </select>
 
           {tipoEntrega === 'entrega' && (
-            <input
-              placeholder="Endereço de entrega *"
-              value={endereco}
-              onChange={(e) => setEndereco(e.target.value)}
-              disabled={enviando}
-              style={{
-                width: '100%',
-                boxSizing: 'border-box', // 👈 ESSENCIAL
-                marginBottom: 12,
-                padding: 14,
-                fontSize: 16,
-                borderRadius: 8,
-                border: '1px solid #ddd',
-              }}
-            />
+            <>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 140px',
+                  gap: 8,
+                  marginBottom: 12,
+                }}
+              >
+                <input
+                  placeholder="Rua *"
+                  value={endereco}
+                  onChange={(e) => setEndereco(e.target.value)}
+                  disabled={enviando}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: 14,
+                    fontSize: 16,
+                    borderRadius: 8,
+                    border: '1px solid #ddd',
+                  }}
+                />
+                <input
+                  placeholder="Número *"
+                  value={numero}
+                  onChange={(e) => setNumero(e.target.value)}
+                  disabled={enviando}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: 14,
+                    fontSize: 16,
+                    borderRadius: 8,
+                    border: '1px solid #ddd',
+                  }}
+                />
+              </div>
+              <input
+                placeholder="Bairro *"
+                value={bairro}
+                onChange={(e) => setBairro(e.target.value)}
+                disabled={enviando}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  marginBottom: 12,
+                  padding: 14,
+                  fontSize: 16,
+                  borderRadius: 8,
+                  border: '1px solid #ddd',
+                }}
+              />
+            </>
           )}
           {tipoEntrega === 'entrega' && (
             <>
@@ -585,36 +702,37 @@ export default function Cardapio(): JSX.Element {
               >
                 <option value="dinheiro">💵 Dinheiro</option>
                 <option value="cartao">💳 Cartão</option>
-                <option value="pix">📱 PIX</option>  
+                <option value="pix">📱 PIX</option>
               </select>
 
-          {formaPagamento === 'pix' && (
-            <PixKeyDisplay
-              pixKey={PIX_CONFIG.key}
-              keyType={PIX_CONFIG.keyType}
-              recipientName={PIX_CONFIG.recipientName}
-              amount={total}
-            />
-          )}
+              {formaPagamento === 'pix' && (
+                <PixKeyDisplay
+                  pixKey={PIX_CONFIG.key}
+                  keyType={PIX_CONFIG.keyType}
+                  recipientName={PIX_CONFIG.recipientName}
+                  amount={total}
+                />
+              )}
 
-          {formaPagamento === 'dinheiro' && tipoEntrega !== 'local' && (
-            <input
-              placeholder="Troco para quanto?"
-              value={troco}
-              onChange={(e) => setTroco(e.target.value)}
-              disabled={enviando}
-              style={{
-                width: '100%',
-                boxSizing: 'border-box', // 👈 ESSENCIAL
-                marginBottom: 12,
-                padding: 14,
-                fontSize: 16,
-                borderRadius: 8,
-                border: '1px solid #ddd',
-              }}
-            />
+              {formaPagamento === 'dinheiro' && tipoEntrega !== 'local' && (
+                <input
+                  placeholder="Troco para quanto?"
+                  value={troco}
+                  onChange={(e) => setTroco(e.target.value)}
+                  disabled={enviando}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box', // 👈 ESSENCIAL
+                    marginBottom: 12,
+                    padding: 14,
+                    fontSize: 16,
+                    borderRadius: 8,
+                    border: '1px solid #ddd',
+                  }}
+                />
+              )}
+            </>
           )}
-          </>)}
 
           {erro && (
             <div
@@ -633,14 +751,26 @@ export default function Cardapio(): JSX.Element {
 
           <button
             onClick={finalizar}
-            disabled={enviando || !nome.trim() || !telefone.trim() || telefone.length < 10 || items.length === 0}
+            disabled={
+              enviando ||
+              !nome.trim() ||
+              !telefone.trim() ||
+              telefone.length < 10 ||
+              items.length === 0 ||
+              (tipoEntrega === 'entrega' && (!endereco.trim() || !numero.trim() || !bairro.trim()))
+            }
             style={{
               width: '100%',
               padding: 16,
               borderRadius: 10,
               border: 'none',
               background:
-                enviando || !nome.trim() || !telefone.trim() || telefone.length < 10 || items.length === 0
+                enviando ||
+                !nome.trim() ||
+                !telefone.trim() ||
+                telefone.length < 10 ||
+                items.length === 0 ||
+                (tipoEntrega === 'entrega' && (!endereco.trim() || !numero.trim() || !bairro.trim()))
                   ? '#95a5a6'
                   : '#27ae60',
               color: '#fff',

@@ -98,6 +98,10 @@ export default function ProductCustomizationModal({
     let freeSlots = indisponiveisHoje.length
     const priceMap: Record<string, number> = {}
 
+    // LÓGICA DE TROCA: Se remove N ingredientes e adiciona N de mesmo preço, não cobra
+    const numRemocoes = ingredientesRemovidos.filter(ing => !indisponiveisSet.has(ing.toLowerCase())).length
+    let trocasDisponiveis = numRemocoes
+
     order.forEach((id) => {
       const extra = extrasAddList.find((e) => e.id === id)
       if (!extra) return
@@ -105,10 +109,18 @@ export default function ProductCustomizationModal({
       const nome = (extra.nome || '').toLowerCase()
       const isContraFile = /contra[- ]?file/.test(nome)
 
+      // Prioridade 1: Slots de ingredientes indisponíveis (exceto contra-filé)
       if (!isContraFile && freeSlots > 0) {
         priceMap[id] = 0
         freeSlots -= 1
-      } else {
+      }
+      // Prioridade 2: Trocas por ingredientes removidos
+      else if (trocasDisponiveis > 0 && extra.preco > 0) {
+        priceMap[id] = 0
+        trocasDisponiveis -= 1
+      }
+      // Prioridade 3: Cobra o preço normal
+      else {
         priceMap[id] = extra.preco
       }
     })
@@ -119,7 +131,7 @@ export default function ProductCustomizationModal({
     )
 
     return { priceById: priceMap, totalExtrasAdicionados: total }
-  }, [extrasSelecionados, extrasSelecionadosDetalhe, extrasAddList, indisponiveisHoje.length])
+  }, [extrasSelecionados, extrasSelecionadosDetalhe, extrasAddList, indisponiveisHoje.length, ingredientesRemovidos, indisponiveisSet])
 
   // Garantir que ingredientesRemoviveis seja array
   const ingredientesLista = Array.isArray(ingredientesRemoviveis) ? ingredientesRemoviveis : []

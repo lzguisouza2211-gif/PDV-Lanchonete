@@ -81,6 +81,21 @@ class ElginI8Printer {
     return output
   }
 
+  private getEndereco(pedido: Pedido): string | null {
+    const endereco = pedido.endereco ? String(pedido.endereco).trim() : ''
+    const numero = pedido.numero ? String(pedido.numero).trim() : ''
+    const bairro = pedido.bairro ? String(pedido.bairro).trim() : ''
+
+    const novoFormato = endereco
+      ? `${endereco}${numero ? `, ${numero}` : ''}${bairro ? ` - ${bairro}` : ''}`
+      : ''
+
+    const legado = pedido.endereco ? String(pedido.endereco).trim() : ''
+
+    const resultado = novoFormato || legado
+    return resultado || null
+  }
+
   /**
    * Gera formato de impressão para PRODUÇÃO
    */
@@ -167,8 +182,11 @@ class ElginI8Printer {
 
     // Endereço
     buffer += 'ENDERECO\n'
-    if (pedido.tipoentrega === 'entrega' && pedido.endereco) {
-      buffer += `${pedido.endereco}\n`
+    if (pedido.tipoentrega === 'entrega') {
+      const endereco = this.getEndereco(pedido)
+      if (endereco) {
+        buffer += `${endereco}\n`
+      }
     }
     buffer += '\n'
 
@@ -309,8 +327,11 @@ class ElginI8Printer {
 
     buffer += `CLIENTE: ${pedido.cliente}\n`
 
-    if (pedido.tipoentrega === 'entrega' && pedido.endereco) {
-      buffer += `ENDERECO: ${pedido.endereco}\n`
+    if (pedido.tipoentrega === 'entrega') {
+      const endereco = this.getEndereco(pedido)
+      if (endereco) {
+        buffer += `ENDERECO: ${endereco}\n`
+      }
     }
 
     buffer += this.divider() + '\n'

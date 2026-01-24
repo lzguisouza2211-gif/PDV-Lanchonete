@@ -8,7 +8,6 @@ export type Adicional = {
 export type Item = {
   nome: string
   preco: number
-  adicionais?: Adicional[]
 }
 
 export type Pedido = {
@@ -19,8 +18,13 @@ export type Pedido = {
   status?: string
   tipoentrega?: string
   endereco?: string
+  endereco?: string
+  numero?: string
+  bairro?: string
   formapagamento?: string
+  phone?: string
   troco?: string | number
+  tempo_preparo?: number
   created_at?: string
   updated_at?: string
 }
@@ -64,10 +68,15 @@ export const pedidosService = {
     return true
   },
 
-  async updateStatus(id: number, status: string): Promise<Pedido> {
+  async updateStatus(id: number, status: string, tempo_preparo?: number): Promise<Pedido> {
+    const updateData: any = { status }
+    if (tempo_preparo !== undefined) {
+      updateData.tempo_preparo = tempo_preparo
+    }
+
     const { data, error } = await supabase
       .from('pedidos')
-      .update({ status })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()

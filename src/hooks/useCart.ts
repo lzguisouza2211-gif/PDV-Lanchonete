@@ -49,6 +49,9 @@ export function useCartWithPedidos() {
     cliente: string
     tipoentrega?: string
     endereco?: string
+    endereco?: string
+    numero?: string
+    bairro?: string
     formapagamento?: string
     troco?: number | string
   }) {
@@ -58,10 +61,18 @@ export function useCartWithPedidos() {
 
     if (cart.items.length === 0) return null
 
+    const endereco =
+      input.tipoentrega === 'entrega' && (input.endereco || input.numero || input.bairro)
+        ? `${input.endereco || ''}${input.numero ? `, ${input.numero}` : ''}${input.bairro ? ` - ${input.bairro}` : ''}`
+        : null
+
     const pedido = {
       cliente: input.cliente,
       tipoEntrega: input.tipoentrega ?? null,
-      endereco: input.endereco ?? null,
+      endereco,
+      endereco: input.tipoentrega === 'entrega' ? input.endereco ?? null : null,
+      numero: input.tipoentrega === 'entrega' ? input.numero ?? null : null,
+      bairro: input.tipoentrega === 'entrega' ? input.bairro ?? null : null,
       formaPagamento: input.formapagamento ?? null,
       troco: input.troco ?? null,
       status: 'Recebido',

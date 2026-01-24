@@ -19,6 +19,20 @@ export default function Admin() {
   const [pedidoSelecionado, setPedidoSelecionado] =
     useState<Pedido | null>(null)
 
+  const formatEndereco = (pedido?: Pedido | null) => {
+    if (!pedido) return ''
+
+    const endereco = (pedido.endereco || '').trim()
+    const numero = (pedido.numero || '').trim()
+    const bairro = (pedido.bairro || '').trim()
+
+    const novoFormato = endereco
+      ? `${endereco}${numero ? `, ${numero}` : ''}${bairro ? ` - ${bairro}` : ''}`
+      : ''
+
+    return novoFormato
+  }
+
   /* =======================
      LOAD INICIAL
   ======================= */
@@ -681,6 +695,12 @@ export default function Admin() {
                 label="Cliente"
                 value={pedidoSelecionado.cliente}
               />
+              {pedidoSelecionado.phone && (
+                <InfoItem
+                  label="Telefone"
+                  value={pedidoSelecionado.phone}
+                />
+              )}
               <InfoItem
                 label="Tipo de Entrega"
                 value={pedidoSelecionado.tipoentrega ?? 'retirada'}
@@ -688,7 +708,7 @@ export default function Admin() {
               {pedidoSelecionado.tipoentrega === 'entrega' && (
                 <InfoItem
                   label="Endereço"
-                  value={pedidoSelecionado.endereco ?? '-'}
+                  value={formatEndereco(pedidoSelecionado) || '-'}
                 />
               )}
               <InfoItem
