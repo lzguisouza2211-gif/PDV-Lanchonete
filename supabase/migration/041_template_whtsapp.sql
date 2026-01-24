@@ -27,19 +27,32 @@ BEGIN
       'Seu pedido:' || E'\n' ||
       itens_formatado || E'\n' ||
       'foi confirmado!!' || E'\n\n' ||
-      '💰 Total: R$ ' || to_char(COALESCE(NEW.total, 0), 'FM999990.00');
+      '💰 Total: R$ ' || to_char(COALESCE(NEW.total, 0), 'FM999990.00') || E'\n' ||
+      'Pagamento: ' || COALESCE(NEW.formapagamento, 'não informado') || E'\n' ||
+      'Tipo: ' || COALESCE(NEW.tipoentrega, 'não informado');
 
     INSERT INTO whatsapp_notifications
       (pedido_id, cliente, phone, message, status_anterior, status_novo, created_at)
     VALUES
       (NEW.id, NEW.cliente, NEW.phone, mensagem_cliente, NULL, NEW.status, NOW());
 
-  -- ...restante igual...
   ELSIF OLD.status IS DISTINCT FROM NEW.status THEN
-    -- Aqui você pode manter a lógica dos outros status normalmente
-    -- Exemplo:
-    -- mensagem_cliente := '...';
-    -- INSERT INTO whatsapp_notifications (...);
+    IF NEW.status = 'Em preparo' THEN
+      mensagem_cliente := '👨‍🍳 Seu pedido está em preparo!';
+    ELSIF NEW.status = 'Finalizado' THEN
+      IF NEW.tipoentrega = 'entrega' THEN
+        mensagem_cliente := '🏍️ Seu pedido saiu para entrega!';
+      ELSE
+        mensagem_cliente := '✅ Seu pedido está pronto!';
+      END IF;
+    ELSE
+      mensagem_cliente := '📦 Status do seu pedido: ' || NEW.status;
+    END IF;
+
+    INSERT INTO whatsapp_notifications
+      (pedido_id, cliente, phone, message, status_anterior, status_novo, created_at)
+    VALUES
+      (NEW.id, NEW.cliente, NEW.phone, mensagem_cliente, OLD.status, NEW.status, NOW());
   END IF;
 
   RETURN NEW;

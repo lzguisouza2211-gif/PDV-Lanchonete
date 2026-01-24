@@ -676,7 +676,7 @@ export default function Cardapio(): JSX.Element {
               />
             </>
           )}
-          {tipoEntrega === 'entrega' && (
+          {(tipoEntrega === 'entrega' || tipoEntrega === 'retirada' || tipoEntrega === 'local') && (
             <>
               <h3 style={{ margin: '16px 0 8px', fontSize: 16, fontWeight: 700 }}>
                 💳 Pagamento
