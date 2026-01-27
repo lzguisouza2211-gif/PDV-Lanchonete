@@ -103,12 +103,12 @@ class ElginI8Printer {
     let buffer = ''
     buffer += this.divider('=') + '\n'
     buffer += this.center('LUIZAO-LANCHES') + '\n'
-    buffer += this.center('PRODUÇÃO') + '\n'
-    buffer += this.center('Ouro Fino - MG') + '\n'
+    buffer += this.center('PRODUCAO') + '\n'
+    buffer += this.center('OURO FINO - MG') + '\n'
     buffer += this.divider('=') + '\n'
     buffer += this.center(`PEDIDO Nº ${pedido.id}`) + '\n'
     buffer += this.divider('-') + '\n'
-    buffer += 'Cliente: ' + (pedido.cliente || '-') + '\n'
+    buffer += 'CLIENTE: ' + (pedido.cliente || '-') + '\n'
     buffer += this.divider('-') + '\n'
     buffer += this.center('ITENS') + '\n'
     buffer += this.divider() + '\n'
@@ -116,7 +116,7 @@ class ElginI8Printer {
       pedido.itens.forEach((item: any, idx: number) => {
         if (idx > 0) buffer += '\n'
         const quantidade = item.quantidade || 1
-        buffer += `${quantidade.toString().padStart(2, ' ')}x ${item.nome}` + '\n'
+        buffer += `${quantidade}x ${item.nome}\n`
         if (item.extras && item.extras.length > 0) {
           item.extras.forEach((extra: any) => {
             const nome = typeof extra === 'string' ? extra : extra.nome
@@ -124,20 +124,20 @@ class ElginI8Printer {
           })
         }
         if (item.observacoes) {
-          buffer += `   Obs: ${item.observacoes}\n`
+          buffer += `   OBS: ${item.observacoes}\n`
         }
       })
     }
     buffer += this.divider() + '\n'
-    buffer += this.leftRight('TOTAL:', `R$ ${pedido.total.toFixed(2)}`) + '\n'
+    buffer += `TOTAL: R$ ${pedido.total.toFixed(2)}\n`
     if (pedido.formapagamento) {
-      buffer += this.leftRight('Pagamento:', pedido.formapagamento.toUpperCase()) + '\n'
+      buffer += `PAGAMENTO: ${pedido.formapagamento.toUpperCase()}\n`
       if (pedido.troco && Number(pedido.troco) > 0) {
-        buffer += this.leftRight('Troco:', `R$ ${Number(pedido.troco).toFixed(2)}`) + '\n'
+        buffer += `TROCO: R$ ${Number(pedido.troco).toFixed(2)}\n`
       }
     }
     buffer += this.divider('-') + '\n'
-    buffer += this.center('NÃO É CUPOM FISCAL') + '\n'
+    buffer += this.center('NAO E CUPOM FISCAL') + '\n'
     buffer += this.divider('=') + '\n'
     buffer += '\n\n\n'
     return buffer
@@ -151,15 +151,15 @@ class ElginI8Printer {
     buffer += this.divider('=') + '\n'
     buffer += this.center('LUIZAO-LANCHES') + '\n'
     buffer += this.center('ENTREGA') + '\n'
-    buffer += this.center('Ouro Fino - MG') + '\n'
+    buffer += this.center('OURO FINO - MG') + '\n'
     buffer += this.divider('=') + '\n'
     buffer += this.center(`PEDIDO Nº ${pedido.id}`) + '\n'
     buffer += this.divider('-') + '\n'
-    buffer += 'Cliente: ' + (pedido.cliente || '-') + '\n'
+    buffer += 'CLIENTE: ' + (pedido.cliente || '-') + '\n'
     if (pedido.tipoentrega === 'entrega') {
       const endereco = this.getEndereco(pedido)
       if (endereco) {
-        buffer += 'Endereço: ' + endereco + '\n'
+        buffer += 'ENDERECO: ' + endereco + '\n'
       }
     }
     buffer += this.divider('-') + '\n'
@@ -169,7 +169,7 @@ class ElginI8Printer {
       pedido.itens.forEach((item: any, idx: number) => {
         if (idx > 0) buffer += '\n'
         const quantidade = item.quantidade || 1
-        buffer += `${quantidade.toString().padStart(2, ' ')}x ${item.nome}` + '\n'
+        buffer += `${quantidade}x ${item.nome}\n`
         if (item.extras && item.extras.length > 0) {
           item.extras.forEach((extra: any) => {
             const nome = typeof extra === 'string' ? extra : extra.nome
@@ -177,29 +177,22 @@ class ElginI8Printer {
           })
         }
         if (item.observacoes) {
-          buffer += `   Obs: ${item.observacoes}\n`
+          buffer += `   OBS: ${item.observacoes}\n`
         }
       })
     }
     buffer += this.divider() + '\n'
-    buffer += this.leftRight('TOTAL:', `R$ ${pedido.total.toFixed(2)}`) + '\n'
+    buffer += `TOTAL: R$ ${pedido.total.toFixed(2)}\n`
     if (pedido.formapagamento) {
-      buffer += this.leftRight('Pagamento:', pedido.formapagamento.toUpperCase()) + '\n'
+      buffer += `PAGAMENTO: ${pedido.formapagamento.toUpperCase()}\n`
       if (pedido.troco && Number(pedido.troco) > 0) {
-        buffer += this.leftRight('Troco:', `R$ ${Number(pedido.troco).toFixed(2)}`) + '\n'
+        buffer += `TROCO: R$ ${Number(pedido.troco).toFixed(2)}\n`
       }
     }
     buffer += this.divider('-') + '\n'
-    buffer += this.center('NÃO É CUPOM FISCAL') + '\n'
-
-    // Rodapé com disclaimer
-    buffer += 'NAO E VALIDO COMO\n'
-    buffer += 'COMPROVANTE DE VENDA\n'
-    buffer += '\n'
-    buffer += 'NAO E VALIDO COMO\n'
-    buffer += 'CUPOM FISCAL\n'
+    buffer += this.center('NAO E CUPOM FISCAL') + '\n'
+    buffer += '\nNAO E VALIDO COMO\nCOMPROVANTE DE VENDA\n\nNAO E VALIDO COMO\nCUPOM FISCAL\n'
     buffer += '\n\n\n\n\n\n\n\n\n\n'
-
     return buffer
   }
 
@@ -208,57 +201,51 @@ class ElginI8Printer {
    */
   generateCompleto(pedido: Pedido): string {
     let buffer = '\n'
-
     buffer += this.center('*** PEDIDO COMPLETO ***') + '\n'
     buffer += this.divider() + '\n'
     buffer += '\n'
-
     buffer += this.center(`#${pedido.id}`) + '\n'
     const horario = new Date((pedido.created_at as string) || new Date())
       .toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     buffer += this.center(horario) + '\n'
     buffer += '\n'
-
     buffer += `CLIENTE: ${pedido.cliente}\n`
-
     if (pedido.tipoentrega === 'entrega') {
       const endereco = this.getEndereco(pedido)
       if (endereco) {
         buffer += `ENDERECO: ${endereco}\n`
       }
     }
-
     buffer += this.divider() + '\n'
     buffer += '\n'
-
     buffer += 'ITENS:\n'
-
     if (pedido.itens && pedido.itens.length > 0) {
       pedido.itens.forEach((item: any) => {
         const quantidade = item.quantidade || 1
         buffer += `${quantidade}x ${item.nome}\n`
-
         if (item.extras && item.extras.length > 0) {
           item.extras.forEach((extra: any) => {
             const nome = typeof extra === 'string' ? extra : extra.nome
-            buffer += `  + ${nome}\n`
+            buffer += `   + ${nome}\n`
           })
+        }
+        if (item.observacoes) {
+          buffer += `   OBS: ${item.observacoes}\n`
         }
       })
     }
-
     buffer += '\n'
     buffer += this.divider() + '\n'
-    buffer += this.leftRight(`TOTAL:`, `R$ ${pedido.total.toFixed(2)}`) + '\n'
-
+    buffer += `TOTAL: R$ ${pedido.total.toFixed(2)}\n`
     if (pedido.formapagamento) {
-      buffer += `Pag: ${pedido.formapagamento}\n`
+      buffer += `PAGAMENTO: ${pedido.formapagamento}\n`
     }
-
+    if (pedido.troco && Number(pedido.troco) > 0) {
+      buffer += `TROCO: R$ ${Number(pedido.troco).toFixed(2)}\n`
+    }
     buffer += '\n'
-    buffer += this.center('Obrigado!') + '\n'
-    buffer += '\n'
-
+    buffer += this.center('OBRIGADO!') + '\n'
+    buffer += '\n\n\n'
     return buffer
   }
 

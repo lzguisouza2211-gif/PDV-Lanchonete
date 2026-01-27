@@ -141,27 +141,22 @@ function GestaoCardapio() {
     }
   }
   // Monta lista de ingredientes apenas da tabela ingredientes_indisponiveis_dia, ordenados alfabeticamente
+  // Atualiza lista global de ingredientes a partir dos produtos do cardápio
   useEffect(() => {
-    async function fetchTodosIngredientesIndisponiveis() {
-      try {
-        const today = new Date().toISOString().slice(0, 10);
-        const { data, error } = await supabase
-          .from('ingredientes_indisponiveis_dia')
-          .select('ingrediente')
-          .eq('valid_on', today);
-        if (error) throw error;
-        // Pega todos os ingredientes distintos e ordena
-        const ingredientes = Array.from(new Set((data || []).map((row: any) => row.ingrediente)))
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b, 'pt-BR'));
-        setTodosIngredientes(ingredientes);
-      } catch (err) {
-        console.error('Erro ao buscar ingredientes globais:', err);
-        setTodosIngredientes([]);
+    // Extrai todos os ingredientes únicos e ordenados dos produtos
+    const ingredientesSet = new Set<string>();
+    produtos.forEach((produto) => {
+      if (Array.isArray(produto.ingredientes)) {
+        produto.ingredientes.forEach((ing) => {
+          if (ing && typeof ing === 'string') {
+            ingredientesSet.add(ing.trim().toLowerCase());
+          }
+        });
       }
-    }
-    fetchTodosIngredientesIndisponiveis();
-  }, []);
+    });
+    const ingredientes = Array.from(ingredientesSet).filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    setTodosIngredientes(ingredientes);
+  }, [produtos]);
   // Handler para toggle global
   async function handleToggleIngredienteGlobal(ingrediente: string, indisponivel: boolean) {
     try {
