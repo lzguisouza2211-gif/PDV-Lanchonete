@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useSaboresRefrigerante } from '../../hooks/useSaboresRefrigerante'
 
 export type ExtraOption = {
   id: string
@@ -38,6 +39,19 @@ export default function ProductCustomizationModal({
   onConfirm,
 }: ProductCustomizationModalProps) {
   const [extrasSelecionados, setExtrasSelecionados] = useState<string[]>([])
+  // Dropdown de sabor de refrigerante
+  const isRefrigerante = produto.categoria?.toLowerCase?.() === 'refrigerante' || produto.nome?.toLowerCase?.().includes('refrigerante')
+  // Tenta inferir tipo do produto pelo nome, se não vier explicitamente
+  let tipoRefrigerante = produto.tipo || ''
+  if (!tipoRefrigerante && isRefrigerante) {
+    const nome = produto.nome?.toLowerCase?.() || ''
+    if (nome.includes('2l')) tipoRefrigerante = '2l'
+    else if (nome.includes('600')) tipoRefrigerante = '600ml'
+    else if (nome.includes('lata')) tipoRefrigerante = 'lata'
+    else tipoRefrigerante = 'lata'
+  }
+  const { sabores, loading: loadingSabores } = useSaboresRefrigerante(tipoRefrigerante)
+  const [saborSelecionado, setSaborSelecionado] = useState<string>('')
   const [ingredientesRemovidos, setIngredientesRemovidos] = useState<string[]>([])
   const [observacoes, setObservacoes] = useState('')
   const [adicionarExpandido, setAdicionarExpandido] = useState(false)
@@ -49,6 +63,9 @@ export default function ProductCustomizationModal({
       setExtrasSelecionados([])
       setIngredientesRemovidos([])
       setObservacoes('')
+      setSaborSelecionado('')
+    }
+    if (isOpen) {
       setAdicionarExpandido(false)
       setRetirarExpandido(false)
     }
@@ -63,14 +80,22 @@ export default function ProductCustomizationModal({
     }
   }, [isOpen])
 
+  // Corrige bug: se todos ingredientesIndisponiveis vierem do banco como FALSE, não há indisponíveis reais
   const { indisponiveisHoje, indisponiveisKey } = useMemo(() => {
     if (!Array.isArray(ingredientesIndisponiveis)) {
       return { indisponiveisHoje: [] as string[], indisponiveisKey: '' }
     }
 
+    // Se todos os ingredientesIndisponiveis são iguais aos removíveis ou ingredientes do produto, e todos estão como FALSE, não há indisponíveis reais
+    // Então, só considera como indisponível se vier pelo menos um valor não vazio e diferente dos ingredientes do produto
     const list = ingredientesIndisponiveis
       .filter(Boolean)
       .map((i) => i.trim())
+
+    // Se vier todos os ingredientes do produto, mas todos estão disponíveis, não mostra nada
+    if (list.length === 0) {
+      return { indisponiveisHoje: [], indisponiveisKey: '' }
+    }
 
     return {
       indisponiveisHoje: list,
@@ -93,34 +118,22 @@ export default function ProductCustomizationModal({
     [extrasAddList, extrasSelecionados]
   )
 
+  // Troca grátis: se o produto tem N ingredientes indisponíveis, o usuário pode escolher N extras quaisquer para serem grátis (exceto contra-filé)
   const { priceById, totalExtrasAdicionados } = useMemo(() => {
     const order = extrasSelecionados
-    let freeSlots = indisponiveisHoje.length
+    const freeSlots = Array.isArray(ingredientesIndisponiveis) ? ingredientesIndisponiveis.filter(Boolean).length : 0
+    let freeUsed = 0
     const priceMap: Record<string, number> = {}
-
-    // LÓGICA DE TROCA: Se remove N ingredientes e adiciona N de mesmo preço, não cobra
-    const numRemocoes = ingredientesRemovidos.filter(ing => !indisponiveisSet.has(ing.toLowerCase())).length
-    let trocasDisponiveis = numRemocoes
 
     order.forEach((id) => {
       const extra = extrasAddList.find((e) => e.id === id)
       if (!extra) return
-
-      const nome = (extra.nome || '').toLowerCase()
+      const nome = (extra.nome || '').toLowerCase().trim()
       const isContraFile = /contra[- ]?file/.test(nome)
-
-      // Prioridade 1: Slots de ingredientes indisponíveis (exceto contra-filé)
-      if (!isContraFile && freeSlots > 0) {
+      if (!isContraFile && freeUsed < freeSlots) {
         priceMap[id] = 0
-        freeSlots -= 1
-      }
-      // Prioridade 2: Trocas por ingredientes removidos
-      else if (trocasDisponiveis > 0 && extra.preco > 0) {
-        priceMap[id] = 0
-        trocasDisponiveis -= 1
-      }
-      // Prioridade 3: Cobra o preço normal
-      else {
+        freeUsed++
+      } else {
         priceMap[id] = extra.preco
       }
     })
@@ -131,18 +144,12 @@ export default function ProductCustomizationModal({
     )
 
     return { priceById: priceMap, totalExtrasAdicionados: total }
-  }, [extrasSelecionados, extrasSelecionadosDetalhe, extrasAddList, indisponiveisHoje.length, ingredientesRemovidos, indisponiveisSet])
+  }, [extrasSelecionados, extrasSelecionadosDetalhe, extrasAddList, ingredientesIndisponiveis])
 
   // Garantir que ingredientesRemoviveis seja array
   const ingredientesLista = Array.isArray(ingredientesRemoviveis) ? ingredientesRemoviveis : []
 
-  useEffect(() => {
-    if (!isOpen) return
-
-    if (indisponiveisHoje.length > 0) {
-      setRetirarExpandido(true)
-    }
-  }, [isOpen, indisponiveisKey])
+  // Removido: não abrir dropdown automaticamente
 
   const toggleExtra = (id: string) => {
     setExtrasSelecionados((prev) =>
@@ -182,9 +189,13 @@ export default function ProductCustomizationModal({
       })),
     ]
 
+    let obs = observacoes.trim()
+    if (isRefrigerante && saborSelecionado) {
+      obs = `Sabor: ${saborSelecionado}` + (obs ? ` | ${obs}` : '')
+    }
     onConfirm({
       extras: extras_final,
-      observacoes: observacoes.trim(),
+      observacoes: obs,
       ingredientes_indisponiveis: indisponiveisHoje,
     })
     
@@ -267,6 +278,26 @@ export default function ProductCustomizationModal({
         </div>
 
         {/* Preço base - Compacto */}
+        {/* Dropdown de sabor de refrigerante */}
+        {isRefrigerante && sabores.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
+              Escolha o sabor
+            </label>
+            <select
+              value={saborSelecionado}
+              onChange={e => setSaborSelecionado(e.target.value)}
+              disabled={loadingSabores}
+              style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ddd', fontSize: 15 }}
+            >
+              <option value="">Selecione o sabor</option>
+              {sabores.map((s: any) => (
+                <option key={s.id} value={s.sabor}>{s.sabor}</option>
+              ))}
+            </select>
+            {loadingSabores && <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>Carregando sabores...</div>}
+          </div>
+        )}
         <div
           style={{
             padding: 8,
@@ -296,10 +327,6 @@ export default function ProductCustomizationModal({
           >
             <div style={{ fontWeight: 700, color: '#b35c00', fontSize: 14, marginBottom: 4 }}>
               ⚠️ Hoje estamos sem: {indisponiveisHoje.join(', ')}
-            </div>
-            <div style={{ fontSize: 13, color: '#6b3b00', lineHeight: 1.4 }}>
-              Você pode escolher outro ingrediente no lugar do que falta, sem custo adicional.
-              Adicionais pagos continuam com os valores mostrados abaixo.
             </div>
           </div>
         )}

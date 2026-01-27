@@ -1,6 +1,7 @@
 import React from 'react'
 import ProductCard from './ProductCard'
 
+
 type CategorySectionProps = {
   categoria: string
   itens: Array<{
@@ -11,6 +12,7 @@ type CategorySectionProps = {
     descricao?: string
     ingredientes?: string[]
     ingredientes_indisponiveis?: string[]
+    tipo?: string // para bebidas
   }>
   onAddItem: (produto: any) => void
   lojaAberta: boolean
@@ -26,6 +28,9 @@ export default function CategorySection({
   produtoAdicionado,
   ingredientesIndisponiveisMap = {},
 }: CategorySectionProps) {
+
+
+  // Demais categorias (padrão)
   return (
     <section style={{ marginBottom: 32 }}>
       <div

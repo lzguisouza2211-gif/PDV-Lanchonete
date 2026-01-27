@@ -84,6 +84,10 @@ export function useCartWithPedidos() {
         nome: item.name,
         preco: item.price,
         quantidade: item.qty,
+        categoria: item.categoria,
+        observacoes: item.observacoes,
+        ingredientes_indisponiveis: item.ingredientes_indisponiveis,
+        extras: item.extras,
       })),
     }
 

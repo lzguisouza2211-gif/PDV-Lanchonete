@@ -2,11 +2,13 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '../../services/supabaseClient'
 import { usePedidosStore } from '../../store/usePedidosStore'
 import usePedidos from '../../hooks/usePedidos'
+import { usePrinter } from '../../hooks/usePrinter'
 
 export default function PedidosAdmin() {
   const { pedidos, setPedidos, addPedido, updatePedido } =
     usePedidosStore()
   const { atualizarStatus } = usePedidos()
+  const { printProducao, printMotoboy } = usePrinter()
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const initializedRef = useRef(false)
@@ -165,6 +167,18 @@ export default function PedidosAdmin() {
         if (!sucesso) {
           alert('Erro ao atualizar status')
           delete statusChangeRef.current[id]
+        } else {
+          // Impressão automática ao passar para "Em preparo"
+          if (novoStatus === 'Em preparo' && pedidoAtual) {
+            // Imprime produção sempre
+            printProducao(pedidoAtual)
+            // Se for entrega, imprime motoboy após pequeno delay
+            if (pedidoAtual.tipoentrega === 'entrega') {
+              setTimeout(() => {
+                printMotoboy(pedidoAtual)
+              }, 1200) // 1.2s para dar tempo de destacar
+            }
+          }
         }
       } catch (error) {
         console.error('Erro ao atualizar status:', error)
@@ -172,7 +186,7 @@ export default function PedidosAdmin() {
         delete statusChangeRef.current[id]
       }
     },
-    [pedidos, updatePedido, atualizarStatus]
+    [pedidos, updatePedido, atualizarStatus, printProducao, printMotoboy]
   )
 
   const formatEndereco = (pedido: any) => {

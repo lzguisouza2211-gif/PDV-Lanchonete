@@ -70,11 +70,11 @@ export default function SuccessModal({
             margin: '0 0 24px 0',
             fontSize: 16,
             color: '#666',
-            lineHeight: 1.5,
+            lineHeight: 2.5,
           }}
         >
           {cliente
-            ? `Obrigado, ${cliente}! Seu pedido foi recebido com sucesso.`
+            ? `Obrigado, ${cliente}! Seu pedido foi recebido com sucesso, voce recebera mais informaçoes pelo whatsapp.`
             : 'Seu pedido foi recebido com sucesso e está sendo preparado.'}
         </p>
 
@@ -89,7 +89,7 @@ export default function SuccessModal({
             fontWeight: 600,
             fontSize: 16,
             cursor: 'pointer',
-            transition: 'background 0.2s ease',
+            transition: 'background 0.9s ease',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#a93226'
