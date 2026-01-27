@@ -83,17 +83,22 @@ export default function usePedidos() {
         .single()
 
       if (error) {
+        const errorMsg =
+          (error.message ? `Mensagem: ${error.message}\n` : '') +
+          (error.details ? `Detalhes: ${error.details}\n` : '') +
+          (error.hint ? `Hint: ${error.hint}\n` : '') +
+          (error.code ? `Código: ${error.code}\n` : '');
+        alert('Erro ao criar pedido!\n' + errorMsg);
         console.error('🔴 [criarPedido] Erro do Supabase:', {
           message: error.message,
           details: error.details,
           hint: error.hint,
           code: error.code,
-        })
-        
-        const errorMessage = error.message || 'Erro desconhecido ao criar pedido'
-        setError(new Error(errorMessage))
-        setLoading(false)
-        return false
+        });
+        const errorMessage = error.message || 'Erro desconhecido ao criar pedido';
+        setError(new Error(errorMessage));
+        setLoading(false);
+        return false;
       }
 
       if (!data) {
