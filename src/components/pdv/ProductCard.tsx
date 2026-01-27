@@ -28,6 +28,12 @@ export default function ProductCard({
     }
   }
 
+  // Ingredientes do produto indisponíveis globalmente
+  // Se ingredientesIndisponiveis contém algum ingrediente do produto, mostra aviso
+  const avisoIndisponiveis = Array.isArray(ingredientesIndisponiveis) && ingredientesIndisponiveis.length > 0 && ingredientesIndisponiveis.some((i) => !!i)
+    ? ingredientesIndisponiveis.filter(Boolean).join(', ')
+    : null
+
   return (
     <div
       style={{
@@ -103,7 +109,7 @@ export default function ProductCard({
             {descricao}
           </p>
         )}
-        {ingredientesIndisponiveis.length > 0 && (
+        {avisoIndisponiveis && (
           <div
             style={{
               marginTop: 8,
@@ -117,7 +123,7 @@ export default function ProductCard({
               lineHeight: 1.3,
             }}
           >
-            Hoje estamos sem: {ingredientesIndisponiveis.join(', ')}.
+            Hoje estamos sem: {avisoIndisponiveis}.
           </div>
         )}
       </div>

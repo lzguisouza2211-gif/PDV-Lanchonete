@@ -66,6 +66,7 @@ export default function CartDrawer({
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '-2px 0 12px rgba(0,0,0,0.12)',
+          paddingBottom: 1, // Aumenta o espaço inferior
         }}
       >
         {/* HEADER */}
@@ -106,6 +107,7 @@ export default function CartDrawer({
             overflowY: 'auto',
             padding: '16px 20px',
           }}
+          className="cart-drawer-section"
         >
           {items.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#999', marginTop: 48 }}>
@@ -363,6 +365,22 @@ export default function CartDrawer({
         @media (max-width: 768px) {
           .cart-drawer {
             max-width: 100%;
+          }
+        }
+        @media (max-width: 400px) {
+          .cart-drawer header {
+            padding: 32px 12px 20px 12px !important;
+          }
+          .cart-drawer strong, .cart-drawer h3 {
+            font-size: 19px !important;
+          }
+          .cart-drawer-section {
+            max-height: 85vh !important;
+            overflow-y: auto !important;
+          }
+          .cart-drawer header {
+            padding-top: 16px !important;
+            padding-bottom: 12px !important;
           }
         }
       `}</style>

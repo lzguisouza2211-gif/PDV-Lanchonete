@@ -73,10 +73,23 @@ export function formatarTelefoneBrasileiro(telefone: string): string {
 }
 
 /**
- * Removes all formatting from a phone number
+ * Removes all formatting from a phone number and ensures country code 55
  * @param telefone - Formatted phone number
- * @returns Only digits
+ * @returns Only digits with country code 55 (Brazilian format for WhatsApp)
  */
 export function limparTelefone(telefone: string): string {
-  return telefone.replace(/\D/g, '')
+  const digitsOnly = telefone.replace(/\D/g, '')
+  
+  // Se já tem código do país 55 e mais de 11 dígitos, retorna como está
+  if (digitsOnly.startsWith('55') && digitsOnly.length >= 12) {
+    return digitsOnly
+  }
+  
+  // Se não tem código do país, adiciona o 55 do Brasil
+  if (digitsOnly.length === 10 || digitsOnly.length === 11) {
+    return '55' + digitsOnly
+  }
+  
+  // Retorna como está se não se encaixar nos padrões
+  return digitsOnly
 }

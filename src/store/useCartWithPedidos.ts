@@ -10,9 +10,12 @@ export function useCartWithPedidos() {
 
   async function criarPedido(input: {
     cliente: string
-    telefone: string
+    phone: string
     tipoEntrega?: string
     endereco?: string
+    endereco?: string
+    numero?: string
+    bairro?: string
     formaPagamento?: string
     troco?: number | string
     taxaEntrega?: number

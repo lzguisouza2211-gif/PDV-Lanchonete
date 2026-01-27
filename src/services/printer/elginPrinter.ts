@@ -81,204 +81,116 @@ class ElginI8Printer {
     return output
   }
 
+  private getEndereco(pedido: Pedido): string | null {
+    const endereco = pedido.endereco ? String(pedido.endereco).trim() : ''
+    const numero = pedido.numero ? String(pedido.numero).trim() : ''
+    const bairro = pedido.bairro ? String(pedido.bairro).trim() : ''
+
+    const novoFormato = endereco
+      ? `${endereco}${numero ? `, ${numero}` : ''}${bairro ? ` - ${bairro}` : ''}`
+      : ''
+
+    const legado = pedido.endereco ? String(pedido.endereco).trim() : ''
+
+    const resultado = novoFormato || legado
+    return resultado || null
+  }
+
   /**
-   * Gera formato de impressão para PRODUÇÃO
+   * Gera formato de impressão para PRODUÇÃO (layout profissional)
    */
   generateProducao(pedido: Pedido): string {
     let buffer = ''
-
-    // Cabeçalho da loja
-    buffer += this.center('Luizao-Lanches') + '\n'
-    buffer += this.center('Ouro Fino-MG') + '\n'
+    buffer += this.divider('=') + '\n'
+    buffer += this.center('LUIZAO-LANCHES') + '\n'
+    buffer += this.center('PRODUÇÃO') + '\n'
+    buffer += this.center('Ouro Fino - MG') + '\n'
+    buffer += this.divider('=') + '\n'
+    buffer += this.center(`PEDIDO Nº ${pedido.id}`) + '\n'
+    buffer += this.divider('-') + '\n'
+    buffer += 'Cliente: ' + (pedido.cliente || '-') + '\n'
+    buffer += this.divider('-') + '\n'
+    buffer += this.center('ITENS') + '\n'
     buffer += this.divider() + '\n'
-
-    // Cabeçalho do pedido
-    buffer += this.center('NUMERO DO PEDIDO') + '\n'
-    buffer += this.center(String(pedido.id)) + '\n'
-    buffer += 'NOME DO CLIENTE\n'
-    buffer += `${pedido.cliente}\n`
-    buffer += '\n'
-    buffer += 'ITENS DO PEDIDO\n'
-    buffer += this.divider() + '\n'
-
     if (pedido.itens && pedido.itens.length > 0) {
       pedido.itens.forEach((item: any, idx: number) => {
         if (idx > 0) buffer += '\n'
         const quantidade = item.quantidade || 1
-        buffer += `${quantidade}x ${item.nome}\n`
-
+        buffer += `${quantidade.toString().padStart(2, ' ')}x ${item.nome}` + '\n'
         if (item.extras && item.extras.length > 0) {
           item.extras.forEach((extra: any) => {
             const nome = typeof extra === 'string' ? extra : extra.nome
-            buffer += `  + ${nome}\n`
+            buffer += `   + ${nome}\n`
           })
         }
-
         if (item.observacoes) {
-          buffer += `  Obs: ${item.observacoes}\n`
+          buffer += `   Obs: ${item.observacoes}\n`
         }
       })
     }
-
     buffer += this.divider() + '\n'
-    buffer += 'VALOR FORMA DE PAGAMENTO E TROCO\n'
-    buffer += this.leftRight(
-      `Total:`,
-      `R$ ${pedido.total.toFixed(2)}`
-    ) + '\n'
-
+    buffer += this.leftRight('TOTAL:', `R$ ${pedido.total.toFixed(2)}`) + '\n'
     if (pedido.formapagamento) {
-      buffer += this.leftRight(
-        `Pagamento:`,
-        pedido.formapagamento.toUpperCase()
-      ) + '\n'
-
+      buffer += this.leftRight('Pagamento:', pedido.formapagamento.toUpperCase()) + '\n'
       if (pedido.troco && Number(pedido.troco) > 0) {
-        buffer += this.leftRight(
-          `Troco:`,
-          `R$ ${Number(pedido.troco).toFixed(2)}`
-        ) + '\n'
+        buffer += this.leftRight('Troco:', `R$ ${Number(pedido.troco).toFixed(2)}`) + '\n'
       }
     }
-
-    // Linhas em branco para que o papel saia completamente da impressora
-    buffer += '\n\n\n\n\n\n\n\n\n\n'
-
+    buffer += this.divider('-') + '\n'
+    buffer += this.center('NÃO É CUPOM FISCAL') + '\n'
+    buffer += this.divider('=') + '\n'
+    buffer += '\n\n\n'
     return buffer
   }
 
   /**
-   * Gera formato de impressão para MOTOBOY
+   * Gera formato de impressão para ENTREGA/MOTOBOY (layout profissional)
    */
   generateMotoboy(pedido: Pedido): string {
     let buffer = ''
-
-    // Cabeçalho da loja
-    buffer += this.center('Luizao-Lanches') + '\n'
-    buffer += this.center('Ouro Fino-MG') + '\n'
-    buffer += this.divider() + '\n'
-
-    // Cabeçalho do pedido
-    buffer += this.center('NUMERO DO PEDIDO') + '\n'
-    buffer += this.center(String(pedido.id)) + '\n'
-    buffer += 'NOME DO CLIENTE\n'
-    buffer += `${pedido.cliente}\n`
-    buffer += '\n'
-
-    // Endereço
-    buffer += 'ENDERECO\n'
-    if (pedido.tipoentrega === 'entrega' && pedido.endereco) {
-      buffer += `${pedido.endereco}\n`
-    }
-    buffer += '\n'
-
-    // Itens (Bebidas, Doces, Cervejas)
-    buffer += 'ITENS\n'
-    buffer += this.divider() + '\n'
-
-    // Debug: verifica se itens têm categoria
-    console.log('🔍 Itens do pedido:', JSON.stringify(pedido.itens, null, 2))
-
-    const itensBebidasDoces = (pedido.itens || []).filter((item: any) => {
-      // Tenta usar categoria primeiro (pedidos novos)
-      if (item.categoria) {
-        const temCategoria = (
-          item.categoria === 'Bebidas' ||
-          item.categoria === 'Cervejas' ||
-          item.categoria === 'Doces'
-        )
-        console.log(`✅ Item "${item.nome}" tem categoria "${item.categoria}": ${temCategoria}`)
-        return temCategoria
+    buffer += this.divider('=') + '\n'
+    buffer += this.center('LUIZAO-LANCHES') + '\n'
+    buffer += this.center('ENTREGA') + '\n'
+    buffer += this.center('Ouro Fino - MG') + '\n'
+    buffer += this.divider('=') + '\n'
+    buffer += this.center(`PEDIDO Nº ${pedido.id}`) + '\n'
+    buffer += this.divider('-') + '\n'
+    buffer += 'Cliente: ' + (pedido.cliente || '-') + '\n'
+    if (pedido.tipoentrega === 'entrega') {
+      const endereco = this.getEndereco(pedido)
+      if (endereco) {
+        buffer += 'Endereço: ' + endereco + '\n'
       }
-      
-      // Fallback: usa nome para pedidos antigos (sem categoria)
-      const nome = (item.nome || '').toLowerCase()
-      const temNome = (
-        // Cervejas
-        nome.includes('cerveja') ||
-        nome.includes('brahma') ||
-        nome.includes('skol') ||
-        nome.includes('heineken') ||
-        nome.includes('antarctica') ||
-        nome.includes('stella') ||
-        nome.includes('budweiser') ||
-        nome.includes('chopp') ||
-        // Bebidas
-        nome.includes('suco') ||
-        nome.includes('refrigerante') ||
-        nome.includes('coca') ||
-        nome.includes('guarana') ||
-        nome.includes('agua') ||
-        nome.includes('água') ||
-        nome.includes('sprite') ||
-        nome.includes('fanta') ||
-        nome.includes('pepsi') ||
-        nome.includes('schweppes') ||
-        nome.includes('tonica') ||
-        nome.includes('abacaxi') ||
-        nome.includes('laranja') ||
-        nome.includes('limao') ||
-        nome.includes('limão') ||
-        nome.includes('morango') ||
-        nome.includes('uva') ||
-        nome.includes('maracuja') ||
-        nome.includes('maracujá') ||
-        nome.includes('açai') ||
-        nome.includes('acai') ||
-        // Doces
-        nome.includes('doce') ||
-        nome.includes('chocolate') ||
-        nome.includes('brigadeiro') ||
-        nome.includes('sorvete') ||
-        nome.includes('bombom') ||
-        nome.includes('trufa') ||
-        nome.includes('pudim') ||
-        nome.includes('mousse') ||
-        nome.includes('bolo') ||
-        nome.includes('torta') ||
-        nome.includes('brownie')
-      )
-      console.log(`⚠️ Item "${item.nome}" SEM categoria, usando nome: ${temNome}`)
-      return temNome
-    })
-
-    console.log(`📦 Total de itens filtrados: ${itensBebidasDoces.length}`)
-
-
-    if (itensBebidasDoces.length > 0) {
-      itensBebidasDoces.forEach((item: any) => {
+    }
+    buffer += this.divider('-') + '\n'
+    buffer += this.center('ITENS') + '\n'
+    buffer += this.divider() + '\n'
+    if (pedido.itens && pedido.itens.length > 0) {
+      pedido.itens.forEach((item: any, idx: number) => {
+        if (idx > 0) buffer += '\n'
         const quantidade = item.quantidade || 1
-        buffer += `${quantidade}x ${item.nome}\n`
+        buffer += `${quantidade.toString().padStart(2, ' ')}x ${item.nome}` + '\n'
+        if (item.extras && item.extras.length > 0) {
+          item.extras.forEach((extra: any) => {
+            const nome = typeof extra === 'string' ? extra : extra.nome
+            buffer += `   + ${nome}\n`
+          })
+        }
+        if (item.observacoes) {
+          buffer += `   Obs: ${item.observacoes}\n`
+        }
       })
     }
-
     buffer += this.divider() + '\n'
-    buffer += '\n'
-
-    // Valores
-    buffer += 'VALOR FORMA DE PAGAMENTO E TROCO\n'
-    buffer += this.leftRight(
-      `Total:`,
-      `R$ ${pedido.total.toFixed(2)}`
-    ) + '\n'
-
+    buffer += this.leftRight('TOTAL:', `R$ ${pedido.total.toFixed(2)}`) + '\n'
     if (pedido.formapagamento) {
-      buffer += this.leftRight(
-        `Pagamento:`,
-        pedido.formapagamento.toUpperCase()
-      ) + '\n'
-
+      buffer += this.leftRight('Pagamento:', pedido.formapagamento.toUpperCase()) + '\n'
       if (pedido.troco && Number(pedido.troco) > 0) {
-        buffer += this.leftRight(
-          `Troco:`,
-          `R$ ${Number(pedido.troco).toFixed(2)}`
-        ) + '\n'
+        buffer += this.leftRight('Troco:', `R$ ${Number(pedido.troco).toFixed(2)}`) + '\n'
       }
     }
-
-    buffer += '\n'
-    buffer += this.divider() + '\n'
-    buffer += '\n'
+    buffer += this.divider('-') + '\n'
+    buffer += this.center('NÃO É CUPOM FISCAL') + '\n'
 
     // Rodapé com disclaimer
     buffer += 'NAO E VALIDO COMO\n'
@@ -309,8 +221,11 @@ class ElginI8Printer {
 
     buffer += `CLIENTE: ${pedido.cliente}\n`
 
-    if (pedido.tipoentrega === 'entrega' && pedido.endereco) {
-      buffer += `ENDERECO: ${pedido.endereco}\n`
+    if (pedido.tipoentrega === 'entrega') {
+      const endereco = this.getEndereco(pedido)
+      if (endereco) {
+        buffer += `ENDERECO: ${endereco}\n`
+      }
     }
 
     buffer += this.divider() + '\n'

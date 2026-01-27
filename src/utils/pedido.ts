@@ -3,9 +3,11 @@ import { limparTelefone, validarTelefoneBrasileiro } from './validation'
 
 export type PedidoPayload = {
   cliente: string
-  telefone: string
+  phone: string
   tipoentrega: string | null
   endereco: string | null
+  numero: string | null
+  bairro: string | null
   formapagamento: string | null
   troco: number | null
   status: string
@@ -33,9 +35,11 @@ export type PedidoPayload = {
 export function normalizePedidoPayload(
   input: {
     cliente: string
-    telefone: string
+    phone: string
     tipoEntrega?: string
     endereco?: string
+    numero?: string
+    bairro?: string
     formaPagamento?: string
     troco?: number | string
     user_id?: string | null
@@ -51,15 +55,15 @@ export function normalizePedidoPayload(
     throw new Error('Carrinho vazio')
   }
 
-  if (!input.telefone) {
+  if (!input.phone) {
     throw new Error('Telefone é obrigatório')
   }
 
-  if (!validarTelefoneBrasileiro(input.telefone)) {
+  if (!validarTelefoneBrasileiro(input.phone)) {
     throw new Error('Telefone inválido')
   }
 
-  const telefone = limparTelefone(input.telefone)
+  const phone = limparTelefone(input.phone)
 
   const subtotal = items.reduce((sum, item) => {
     const extras = (item.extras || []).reduce(
@@ -83,16 +87,22 @@ export function normalizePedidoPayload(
     if (!isNaN(t) && t > 0) troco = t
   }
 
-  const endereco =
-    input.tipoEntrega === 'entrega' && input.endereco
-      ? input.endereco.trim()
-      : null
+  const isEntrega = input.tipoEntrega === 'entrega'
+  const enderecoEntrega = isEntrega && input.endereco ? input.endereco.trim() : ''
+  const numeroEntrega = isEntrega && input.numero ? input.numero.trim() : ''
+  const bairroEntrega = isEntrega && input.bairro ? input.bairro.trim() : ''
+
+  const endereco = isEntrega && (enderecoEntrega || numeroEntrega || bairroEntrega)
+    ? `${enderecoEntrega}${numeroEntrega ? `, ${numeroEntrega}` : ''}${bairroEntrega ? ` - ${bairroEntrega}` : ''}`.trim()
+    : null
 
   return {
     cliente: input.cliente.trim(),
-    telefone,
+    phone,
     tipoentrega: input.tipoEntrega || null,
     endereco,
+    numero: isEntrega && numeroEntrega ? numeroEntrega : null,
+    bairro: isEntrega && bairroEntrega ? bairroEntrega : null,
     formapagamento: input.formaPagamento || null,
     troco,
     status: 'Recebido',
