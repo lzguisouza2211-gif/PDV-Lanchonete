@@ -1,78 +1,3 @@
-import { supabase } from '../../services/supabaseClient'
-function IngredientesIndisponiveisPanel() {
-
-  const [ingredientes, setIngredientes] = useState<{ ingrediente: string, indisponivel: boolean }[]>([])
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    const fetchIngredientes = async () => {
-      setLoading(true)
-      // Busca todos os ingredientes possíveis (pode ser de outra tabela, ajuste conforme necessário)
-      // Aqui, para exemplo, busca todos da tabela ingredientes_indisponiveis_dia de hoje e faz merge
-      const today = new Date().toISOString().slice(0, 10)
-      // Busca todos os ingredientes marcados como indisponíveis hoje
-      const { data: indisponiveis, error: errIndisp } = await supabase
-        .from('ingredientes_indisponiveis_dia')
-        .select('ingrediente')
-        .eq('valid_on', today)
-      // Aqui você pode buscar a lista completa de ingredientes do seu cardápio para exibir todos
-      // Exemplo: const todosIngredientes = await ingredientesService.getTodosIngredientes()
-      // Para exemplo, vamos supor uma lista fixa:
-      const todosIngredientes = [
-        'Alface', 'Tomate', 'Queijo', 'Presunto', 'Bacon', 'Ovo', 'Maionese', 'Frango', 'Carne', 'Calabresa'
-      ]
-      const indisponiveisSet = new Set((indisponiveis || []).map((i: any) => i.ingrediente))
-      setIngredientes(todosIngredientes.map(ing => ({ ingrediente: ing, indisponivel: indisponiveisSet.has(ing) })))
-      setLoading(false)
-    }
-    fetchIngredientes()
-  }, [])
-
-  const toggleIndisponivel = async (ingrediente: string, atual: boolean) => {
-    const today = new Date().toISOString().slice(0, 10)
-    if (!atual) {
-      // Marcar como indisponível: upsert na tabela do dia, sempre setando indisponivel: true
-      await supabase
-        .from('ingredientes_indisponiveis_dia')
-        .upsert([{ ingrediente, valid_on: today, indisponivel: true }], { onConflict: 'ingrediente,valid_on' })
-    } else {
-      // Marcar como disponível: remover da tabela do dia
-      await supabase
-        .from('ingredientes_indisponiveis_dia')
-        .delete()
-        .eq('ingrediente', ingrediente)
-        .eq('valid_on', today)
-    }
-    // Atualiza estado local
-    setIngredientes(ingredientes =>
-      ingredientes.map(i =>
-        i.ingrediente === ingrediente ? { ...i, indisponivel: !atual } : i
-      )
-    )
-  }
-
-  return (
-    <div style={{ marginBottom: 32 }}>
-      <h3>Ingredientes indisponíveis</h3>
-      {loading ? <p>Carregando...</p> : (
-        <ul>
-          {ingredientes.map(i => (
-            <li key={i.ingrediente} style={{ marginBottom: 8 }}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={i.indisponivel}
-                  onChange={() => toggleIndisponivel(i.ingrediente, i.indisponivel)}
-                />
-                {i.ingrediente}
-              </label>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
 import { useEffect, useState, useMemo } from 'react'
 import usePedidos from '../../hooks/usePedidos'
 import { Pedido } from '../../services/api/pedidos.service'
@@ -89,8 +14,8 @@ export default function Dashboard() {
   const [tempoEsperaDia, setTempoEsperaDia] = useState<number>(40)
   const [savingTempo, setSavingTempo] = useState(false)
   const [mostrarSucesso, setMostrarSucesso] = useState(false)
-
   const [editingTempo, setEditingTempo] = useState(false)
+
   useEffect(() => {
     const load = async () => {
       const data = await listPedidos()
@@ -98,7 +23,7 @@ export default function Dashboard() {
       
       // Busca tempo de espera do dia
       const status = await storeStatusService.getStatus()
-      if (status?.tempo_espera_padrao && !editingTempo) {
+      if (status?.tempo_espera_padrao) {
         setTempoEsperaDia(status.tempo_espera_padrao)
       }
     }
@@ -191,7 +116,6 @@ export default function Dashboard() {
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px' }}>
-      {/* <IngredientesIndisponiveisPanel /> */}
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ marginBottom: 8, fontSize: 32, fontWeight: 700 }}>
           📊 Dashboard
@@ -206,6 +130,37 @@ export default function Dashboard() {
         >
           {hoje}
         </p>
+        <div
+          style={{
+            marginTop: 12,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 16px',
+            borderRadius: 20,
+            background: isOpen ? '#f0fdf4' : '#fef2f2',
+            border: `1px solid ${isOpen ? '#bbf7d0' : '#fecaca'}`,
+          }}
+        >
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: isOpen ? '#22c55e' : '#ef4444',
+              display: 'block',
+            }}
+          />
+          <span
+            style={{
+              fontSize: 14,
+              color: isOpen ? '#166534' : '#991b1b',
+              fontWeight: 600,
+            }}
+          >
+            {isOpen ? '🟢 Loja Aberta' : '🔴 Loja Fechada'}
+          </span>
+        </div>
       </div>
 
       {/* CARDS DE MÉTRICAS */}

@@ -14,9 +14,11 @@ export type ItemCardapio = {
 }
 
 class CardapioService {
+  /**
+   * Retorna um array de itens do cardápio, cada um com ingredientes_indisponiveis,
+   * e adiciona a propriedade global proibeGratuidade (em cada item, para fácil acesso no front).
+   */
   async list(): Promise<ItemCardapio[]> {
-    // ⚡ Otimizado: Remover ordem_categoria (causa erro + retry lento)
-    // Usar apenas categoria + nome para ordenação
     const { data, error } = await supabase
       .from('cardapio')
       .select('id, nome, preco, categoria, ativo, descricao, ingredientes, disponivel')
@@ -32,9 +34,8 @@ class CardapioService {
 
     console.log('📥 Cardápio carregado:', data?.length, 'itens')
 
-    const indisponiveisHoje = await this.listarIngredientesIndisponiveisHoje()
+    const { mapa, proibeGratuidade } = await this.listarIngredientesIndisponiveisHoje()
 
-    // Parse ingredientes JSON se existir e anexa indisponíveis do dia
     return (data || []).map((item: any) => ({
       ...item,
       id: String(item.id),
@@ -43,12 +44,12 @@ class CardapioService {
         : typeof item.ingredientes === 'string'
         ? JSON.parse(item.ingredientes || '[]')
         : item.ingredientes || [],
-      ingredientes_indisponiveis: indisponiveisHoje[String(item.id)] || [],
+      ingredientes_indisponiveis: mapa[String(item.id)] || [],
+      proibeGratuidade,
     })) as ItemCardapio[]
   }
 
   async listAll(): Promise<ItemCardapio[]> {
-    // Método para admin ver TODOS os produtos (ativos)
     const { data, error } = await supabase
       .from('cardapio')
       .select('id, nome, preco, categoria, ativo, descricao, ingredientes, disponivel')
@@ -63,9 +64,8 @@ class CardapioService {
 
     console.log('📥 Cardápio admin carregado:', data?.length, 'itens')
 
-    const indisponiveisHoje = await this.listarIngredientesIndisponiveisHoje()
+    const { mapa, proibeGratuidade } = await this.listarIngredientesIndisponiveisHoje()
 
-    // Parse ingredientes JSON se existir e anexa indisponíveis do dia
     return (data || []).map((item: any) => ({
       ...item,
       id: String(item.id),
@@ -74,7 +74,8 @@ class CardapioService {
         : typeof item.ingredientes === 'string'
         ? JSON.parse(item.ingredientes || '[]')
         : item.ingredientes || [],
-      ingredientes_indisponiveis: indisponiveisHoje[String(item.id)] || [],
+      ingredientes_indisponiveis: mapa[String(item.id)] || [],
+      proibeGratuidade,
     })) as ItemCardapio[]
   }
 
@@ -131,58 +132,115 @@ class CardapioService {
     }
   }
 
-  async listarIngredientesIndisponiveisHoje(): Promise<Record<string, string[]>> {
+  /**
+   * Retorna um objeto com:
+   * - mapa: Record<string, string[]> (ingredientes indisponíveis por produto)
+   * - proibeGratuidade: boolean (true se algum indisponível do dia tem pg = true)
+   */
+  async listarIngredientesIndisponiveisHoje(): Promise<{ mapa: Record<string, string[]>; proibeGratuidade: boolean }> {
     const today = new Date().toISOString().slice(0, 10)
     try {
+      // Busca todos os ingredientes marcados como indisponíveis (indisponivel = true) para o dia, incluindo flag pg
       const { data, error } = await supabase
         .from('ingredientes_indisponiveis_dia')
-        .select('cardapio_id, ingrediente')
+        .select('id, ingrediente, indisponivel, pg, valid_on')
         .eq('valid_on', today)
-
       if (error) throw error
-
+      // Só considera os ingredientes que estão indisponíveis (indisponivel = true)
+      const indisponiveisHoje = (data || []).filter((row: any) => row.indisponivel === true)
+      // Busca todos os produtos ativos e seus ingredientes
+      const { data: produtos, error: errProdutos } = await supabase
+        .from('cardapio')
+        .select('id, ingredientes')
+        .eq('ativo', true)
+      if (errProdutos) throw errProdutos
       const mapa: Record<string, string[]> = {}
-      ;(data || []).forEach((row: any) => {
-        const key = String(row.cardapio_id)
-        if (!mapa[key]) mapa[key] = []
-        mapa[key].push(row.ingrediente)
+      // Novo: mapeia ingredientes indisponíveis e se pg=true
+      const pgMap: Record<string, boolean> = {}
+      indisponiveisHoje.forEach((row: any) => {
+        pgMap[row.ingrediente.toLowerCase().trim()] = !!row.pg
       })
-
-      return mapa
+      produtos.forEach((prod: any) => {
+        const key = String(prod.id)
+        const ingredientesProduto = Array.isArray(prod.ingredientes)
+          ? prod.ingredientes.map((i: string) => i.toLowerCase().trim())
+          : []
+        mapa[key] = []
+        indisponiveisHoje.forEach((row: any) => {
+          // Só adiciona se o produto realmente tem o ingrediente
+          if (ingredientesProduto.includes(row.ingrediente.toLowerCase().trim())) {
+            mapa[key].push(row.ingrediente)
+          }
+        })
+      })
+      // Se pelo menos um ingrediente indisponível do dia tem pg=true, libera troca grátis
+      const proibeGratuidade = Object.values(pgMap).some((v) => v === true)
+      return { mapa, proibeGratuidade }
     } catch (error: any) {
       const msg = error?.message || ''
       if (msg.includes("Could not find the table 'public.ingredientes_indisponiveis_dia'")) {
         console.warn('⚠️ Migration 019 (ingredientes_indisponiveis_dia) não aplicada; ignorando ingredientes indisponíveis.')
-        return {}
+        return { mapa: {}, proibeGratuidade: false }
       }
       console.error('❌ Erro ao buscar ingredientes indisponíveis:', msg)
-      return {}
+      return { mapa: {}, proibeGratuidade: false }
     }
   }
 
+  // Função para normalizar ingrediente: maiúsculo e sem acento
+    normalizarIngrediente(nome: string) {
+      return nome
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim()
+    }
+
   async definirIngredienteIndisponivel(
-    cardapioId: string,
+    _cardapioId: string | null,
     ingrediente: string,
-    indisponivel: boolean
+    indisponivel: boolean,
+    global: boolean = true
   ): Promise<void> {
+    const ingredienteBusca = this.normalizarIngrediente(ingrediente)
     const today = new Date().toISOString().slice(0, 10)
     try {
       if (indisponivel) {
-        const { error } = await supabase
+        // Sempre faz select primeiro
+        const { data: selectData, error: selectError } = await supabase
           .from('ingredientes_indisponiveis_dia')
-          .upsert({ cardapio_id: Number(cardapioId), ingrediente, valid_on: today })
-
-        if (error) throw error
-        return
+          .select('id, indisponivel')
+          .eq('ingrediente', ingredienteBusca)
+          .eq('valid_on', today)
+        if (selectError) throw selectError
+        if (selectData && selectData.length > 0) {
+          // Se já existe, só faz update se indisponivel for false
+          const row = selectData[0]
+          if (!row.indisponivel) {
+            const { error: updateError } = await supabase
+              .from('ingredientes_indisponiveis_dia')
+              .update({ indisponivel: true })
+              .eq('id', row.id)
+            if (updateError) throw updateError
+          }
+          return
+        } else {
+          // Se não existe, faz insert
+          const insertData = { ingrediente: ingredienteBusca, valid_on: today, indisponivel: true }
+          const { error: insertError } = await supabase
+            .from('ingredientes_indisponiveis_dia')
+            .insert([insertData])
+          if (insertError) throw insertError
+          return
+        }
       }
 
+      // Para marcar como disponível, faz update para indisponivel: false
       const { error } = await supabase
         .from('ingredientes_indisponiveis_dia')
-        .delete()
-        .eq('cardapio_id', Number(cardapioId))
-        .eq('ingrediente', ingrediente)
+        .update({ indisponivel: false })
+        .eq('ingrediente', ingredienteBusca)
         .eq('valid_on', today)
-
       if (error) throw error
     } catch (error: any) {
       const msg = error?.message || ''

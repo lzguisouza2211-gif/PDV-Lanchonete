@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import GlobalIngredientesCard from '../../components/admin/GlobalIngredientesCard';
+import GestaoRefrigerantes from '../../components/admin/GestaoRefrigerantes';
 import { supabase } from '../../services/supabaseClient';
 import { cardapioService } from '../../services/api/cardapio.service';
 import { deliveryFeeService } from '../../services/api/deliveryFee.service';
@@ -37,6 +39,8 @@ function GestaoCardapio() {
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
   const [editingPriceValue, setEditingPriceValue] = useState('');
   const [ingredientesIndisponiveis, setIngredientesIndisponiveis] = useState<Record<number, string[]>>({});
+  const [ingredientesGlobaisIndisponiveis, setIngredientesGlobaisIndisponiveis] = useState<string[]>([]);
+  const [todosIngredientes, setTodosIngredientes] = useState<string[]>([]);
   const [taxaEntrega, setTaxaEntrega] = useState(0);
   const [novoValorTaxaEntrega, setNovoValorTaxaEntrega] = useState('0');
   const [editingTaxaEntrega, setEditingTaxaEntrega] = useState(false);
@@ -122,14 +126,50 @@ function GestaoCardapio() {
 
   async function fetchIngredientesIndisponiveis() {
     try {
-      const mapa = await cardapioService.listarIngredientesIndisponiveisHoje();
-      const convertida: Record<number, string[]> = {};
-      Object.entries(mapa).forEach(([key, lista]) => {
-        convertida[Number(key)] = lista;
-      });
-      setIngredientesIndisponiveis(convertida);
+      // Busca todos os ingredientes do dia (indisponivel TRUE e FALSE)
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from('ingredientes_indisponiveis_dia')
+        .select('ingrediente, indisponivel')
+        .eq('valid_on', today);
+      if (error) throw error;
+      // Monta lista de ingredientes indisponíveis (TRUE)
+      const indisponiveis = (data || []).filter((row: any) => row.indisponivel === true).map((row: any) => row.ingrediente);
+      setIngredientesGlobaisIndisponiveis(indisponiveis);
     } catch (err) {
       console.error('Erro ao buscar ingredientes indisponíveis:', err);
+    }
+  }
+  // Monta lista de ingredientes apenas da tabela ingredientes_indisponiveis_dia, ordenados alfabeticamente
+  useEffect(() => {
+    async function fetchTodosIngredientesIndisponiveis() {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data, error } = await supabase
+          .from('ingredientes_indisponiveis_dia')
+          .select('ingrediente')
+          .eq('valid_on', today);
+        if (error) throw error;
+        // Pega todos os ingredientes distintos e ordena
+        const ingredientes = Array.from(new Set((data || []).map((row: any) => row.ingrediente)))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        setTodosIngredientes(ingredientes);
+      } catch (err) {
+        console.error('Erro ao buscar ingredientes globais:', err);
+        setTodosIngredientes([]);
+      }
+    }
+    fetchTodosIngredientesIndisponiveis();
+  }, []);
+  // Handler para toggle global
+  async function handleToggleIngredienteGlobal(ingrediente: string, indisponivel: boolean) {
+    try {
+      await cardapioService.definirIngredienteIndisponivel(null, ingrediente, indisponivel, true);
+      await fetchIngredientesIndisponiveis();
+    } catch (err) {
+      console.error('Erro ao atualizar ingrediente global:', err);
+      await fetchIngredientesIndisponiveis();
     }
   }
 
@@ -140,10 +180,27 @@ function GestaoCardapio() {
     return Array.from(new Set(partes));
   }
 
-  async function toggleIngredienteDisponibilidade(produtoId: number, ingrediente: string) {
+  async function toggleIngredienteDisponibilidade(produtoId: number, ingrediente: string, global: boolean = false) {
+    // Se global, aplica/remover para todos os produtos
+    if (global) {
+      try {
+        await cardapioService.definirIngredienteIndisponivel(null, ingrediente, true, true);
+        await fetchIngredientesIndisponiveis();
+      } catch (err: any) {
+        console.error('Erro ao atualizar ingrediente global:', err);
+        await fetchIngredientesIndisponiveis();
+        const msg = err?.message || '';
+        if (msg.includes('ingredientes_indisponiveis_dia')) {
+          alert('Tabela ingredientes_indisponiveis_dia não existe. Rode a migration 019 no Supabase.');
+        } else {
+          alert('Erro ao atualizar ingrediente global');
+        }
+      }
+      return;
+    }
+    // Individual por produto
     const indisponiveisProduto = ingredientesIndisponiveis[produtoId] || [];
     const jaIndisponivel = indisponiveisProduto.includes(ingrediente);
-
     try {
       setIngredientesIndisponiveis((prev) => ({
         ...prev,
@@ -151,12 +208,13 @@ function GestaoCardapio() {
           ? prev[produtoId]?.filter((ing) => ing !== ingrediente) || []
           : [...(prev[produtoId] || []), ingrediente],
       }));
-
       await cardapioService.definirIngredienteIndisponivel(
         String(produtoId),
         ingrediente,
         !jaIndisponivel,
+        false
       );
+      await fetchIngredientesIndisponiveis();
     } catch (err: any) {
       console.error('Erro ao atualizar ingrediente:', err);
       await fetchIngredientesIndisponiveis();
@@ -268,6 +326,13 @@ function GestaoCardapio() {
       </header>
 
       <main className="gestao-main">
+        {/* Card global de ingredientes */}
+        <GlobalIngredientesCard
+          onToggle={handleToggleIngredienteGlobal}
+          indisponiveis={ingredientesGlobaisIndisponiveis}
+          todosIngredientes={todosIngredientes}
+        />
+        <GestaoRefrigerantes />
         <section className="gestao-filtros">
           <div className="gestao-categoria-select-wrapper">
             <label className="gestao-categoria-label">Categoria</label>
@@ -312,6 +377,10 @@ function GestaoCardapio() {
               const ingredientes = Array.isArray(produto.ingredientes) && produto.ingredientes.length > 0
                 ? produto.ingredientes
                 : extrairIngredientes(produto.descricao);
+              // Ingredientes indisponíveis globalmente presentes neste produto
+              const indisponiveisNoProduto = ingredientesGlobaisIndisponiveis.filter((ing) =>
+                ingredientes.map((i) => i.toLowerCase().trim()).includes(ing.toLowerCase().trim())
+              );
               return (
                 <div key={produto.id} className="gestao-card">
                   <div className="card-header">
@@ -320,6 +389,24 @@ function GestaoCardapio() {
                   </div>
 
                   <p className="card-descricao">{produto.descricao}</p>
+
+                  {indisponiveisNoProduto.length > 0 && (
+                    <div
+                      style={{
+                        margin: '8px 0',
+                        padding: '8px 10px',
+                        borderRadius: 10,
+                        background: '#fff7ed',
+                        border: '1px dashed #f39c12',
+                        color: '#b35c00',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      Ingrediente indisponível hoje: {indisponiveisNoProduto.join(', ')}
+                    </div>
+                  )}
 
                   <div className="card-preco-section">
                     {editingPriceId === produto.id ? (
@@ -368,25 +455,7 @@ function GestaoCardapio() {
                     </button>
                   </div>
 
-                  {CATEGORIAS_COM_INGREDIENTES.includes(produto.categoria) && ingredientes.length > 0 && (
-                    <div className="card-ingredientes-inline">
-                      <div className="ingredientes-label">Ingredientes</div>
-                      <div className="ingredientes-buttons">
-                        {ingredientes.map((ing) => {
-                          const indispo = (ingredientesIndisponiveis[produto.id] || []).includes(ing);
-                          return (
-                            <button
-                              key={ing}
-                              className={`ingrediente-badge ${indispo ? 'indisponivel' : 'disponivel'}`}
-                              onClick={() => toggleIngredienteDisponibilidade(produto.id, ing)}
-                            >
-                              <span className="badge-icon">{indispo ? '✕' : '✓'}</span> {ing}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  {/* Ingredientes clicáveis removidos do card de produto */}
                 </div>
               );
             })}

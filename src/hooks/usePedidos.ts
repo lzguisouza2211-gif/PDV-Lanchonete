@@ -74,6 +74,8 @@ export default function usePedidos() {
       setLoading(true)
       setError(null)
 
+      console.log('🔵 [criarPedido] Enviando payload:', JSON.stringify(pedido, null, 2))
+
       const { data, error } = await supabase
         .from('pedidos')
         .insert([pedido])
@@ -81,9 +83,13 @@ export default function usePedidos() {
         .single()
 
       if (error) {
-        // ✅ Melhorar o log do erro
+        console.error('🔴 [criarPedido] Erro do Supabase:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        })
         
-        // ✅ Mostrar erro mais específico
         const errorMessage = error.message || 'Erro desconhecido ao criar pedido'
         setError(new Error(errorMessage))
         setLoading(false)
@@ -103,11 +109,11 @@ export default function usePedidos() {
   )
 
   const atualizarStatus = useCallback(
-    async (id: number, status: string): Promise<Pedido> => {
+    async (id: number, status: string, tempo_preparo?: number): Promise<Pedido> => {
       setLoading(true)
       setError(null)
       try {
-        return await pedidosService.updateStatus(id, status)
+        return await pedidosService.updateStatus(id, status, tempo_preparo)
       } catch (e: any) {
         // Logamos para inspecionar rapidamente no console
         console.error('Erro Supabase ao atualizar status', e)
