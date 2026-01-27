@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import './Admin.css';
+
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 function Admin() {
     const [pedidos, setPedidos] = useState([]);
@@ -16,24 +22,26 @@ function Admin() {
 
     // Carregar pedidos e tocar som quando houver novo pedido
     useEffect(() => {
-        const carregarPedidos = () => {
-            fetch('http://192.168.1.3:3000/pedidos')
-                .then((res) => res.json())
-                .then((data) => {
-                    const pedidosOrdenados = data.sort((a, b) => b.id - a.id);
-                    
-                    // Se chegou um novo pedido e o som estiver habilitado, tocar som
-                    if (pedidos.length < pedidosOrdenados.length && somHabilitado) {
-                        tocarSom();
-                    }
-                    setPedidos(pedidosOrdenados);
-                })
-                .catch(() => {});
+        let isMounted = true;
+        const carregarPedidos = async () => {
+            const { data, error } = await supabase
+                .from('pedidos')
+                .select('*')
+                .order('id', { ascending: false });
+            if (!error && data) {
+                // Se chegou um novo pedido e o som estiver habilitado, tocar som
+                if (pedidos.length < data.length && somHabilitado) {
+                    tocarSom();
+                }
+                if (isMounted) setPedidos(data);
+            }
         };
-
         carregarPedidos();
         const intervalo = setInterval(carregarPedidos, 5000);
-        return () => clearInterval(intervalo);
+        return () => {
+            isMounted = false;
+            clearInterval(intervalo);
+        };
     }, [pedidos, somHabilitado, tocarSom]);
 
     // Forçar ativação do áudio com interação do usuário
@@ -44,22 +52,20 @@ function Admin() {
 
     // (tocarSom agora definido acima com useCallback)
 
-    const atualizarStatus = (id, status) => {
+    const atualizarStatus = async (id, status) => {
         setStatusAtualizando(id);
-
-        fetch(`http://192.168.1.3:3000/pedidos/${id}/status`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status }),
-        })
-            .then(() => {
-                setPedidos((pedidos) =>
-                    pedidos.map((pedido) =>
-                        pedido.id === id ? { ...pedido, status } : pedido
-                    )
-                );
-            })
-            .finally(() => setStatusAtualizando(null));
+        const { error } = await supabase
+            .from('pedidos')
+            .update({ status })
+            .eq('id', id);
+        if (!error) {
+            setPedidos((pedidos) =>
+                pedidos.map((pedido) =>
+                    pedido.id === id ? { ...pedido, status } : pedido
+                )
+            );
+        }
+        setStatusAtualizando(null);
     };
 
     const calcularTotalPedido = (pedido) => {
