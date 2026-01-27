@@ -64,8 +64,9 @@ class ElginI8Printer {
   /**
    * Formata divisor
    */
-  private divider(char: string = '-'): string {
-    return char.repeat(this.config.paperWidth || 48)
+  private divider(char: string = ' '): string {
+    // Remove tracejado, retorna linha em branco para espaçamento
+    return '\n'
   }
 
   /**
@@ -101,44 +102,39 @@ class ElginI8Printer {
    */
   generateProducao(pedido: Pedido): string {
     let buffer = ''
-    buffer += this.divider('=') + '\n'
-    buffer += this.center('LUIZAO-LANCHES') + '\n'
-    buffer += this.center('PRODUCAO') + '\n'
-    buffer += this.center('OURO FINO - MG') + '\n'
-    buffer += this.divider('=') + '\n'
-    buffer += this.center(`PEDIDO Nº ${pedido.id}`) + '\n'
-    buffer += this.divider('-') + '\n'
-    buffer += 'CLIENTE: ' + (pedido.cliente || '-') + '\n'
-    buffer += this.divider('-') + '\n'
-    buffer += this.center('ITENS') + '\n'
-    buffer += this.divider() + '\n'
+    buffer += this.center('LUIZAO-LANCHES').toUpperCase() + '\n\n'
+    buffer += this.center('PRODUÇÃO').toUpperCase() + '\n\n'
+    buffer += this.center('OURO FINO - MG') + '\n\n'
+    buffer += this.center(`PEDIDO Nº ${pedido.id}`) + '\n\n'
+    buffer += 'CLIENTE: ' + (pedido.cliente || '-') + '\n\n'
+    buffer += this.center('ITENS') + '\n\n'
     if (pedido.itens && pedido.itens.length > 0) {
-      pedido.itens.forEach((item: any, idx: number) => {
-        if (idx > 0) buffer += '\n'
+      pedido.itens.forEach((item: any) => {
         const quantidade = item.quantidade || 1
-        buffer += `${quantidade}x ${item.nome}\n`
+        buffer += `${quantidade}x ${item.nome.toUpperCase()}\n`
         if (item.extras && item.extras.length > 0) {
           item.extras.forEach((extra: any) => {
             const nome = typeof extra === 'string' ? extra : extra.nome
-            buffer += `   + ${nome}\n`
+            buffer += `   + ${nome.toUpperCase()}\n`
           })
         }
         if (item.observacoes) {
-          buffer += `   OBS: ${item.observacoes}\n`
+          buffer += `   OBS: ${item.observacoes.toUpperCase()}\n`
         }
+        buffer += '\n'
       })
     }
-    buffer += this.divider() + '\n'
-    buffer += `TOTAL: R$ ${pedido.total.toFixed(2)}\n`
+    buffer += '\n'
+    buffer += '==============================\n'
+    buffer += this.center(`TOTAL: R$ ${pedido.total.toFixed(2)}`).toUpperCase() + '\n'
     if (pedido.formapagamento) {
-      buffer += `PAGAMENTO: ${pedido.formapagamento.toUpperCase()}\n`
+      buffer += this.center(`PAGAMENTO: ${pedido.formapagamento.toUpperCase()}`) + '\n'
       if (pedido.troco && Number(pedido.troco) > 0) {
-        buffer += `TROCO: R$ ${Number(pedido.troco).toFixed(2)}\n`
+        buffer += this.center(`TROCO: R$ ${Number(pedido.troco).toFixed(2)}`) + '\n'
       }
     }
-    buffer += this.divider('-') + '\n'
-    buffer += this.center('NAO E CUPOM FISCAL') + '\n'
-    buffer += this.divider('=') + '\n'
+    buffer += '\n==============================\n'
+    buffer += this.center('NÃO É CUPOM FISCAL') + '\n\n'
     buffer += '\n\n\n'
     return buffer
   }
@@ -148,51 +144,46 @@ class ElginI8Printer {
    */
   generateMotoboy(pedido: Pedido): string {
     let buffer = ''
-    buffer += this.divider('=') + '\n'
-    buffer += this.center('LUIZAO-LANCHES') + '\n'
-    buffer += this.center('ENTREGA') + '\n'
-    buffer += this.center('OURO FINO - MG') + '\n'
-    buffer += this.divider('=') + '\n'
-    buffer += this.center(`PEDIDO Nº ${pedido.id}`) + '\n'
-    buffer += this.divider('-') + '\n'
-    buffer += 'CLIENTE: ' + (pedido.cliente || '-') + '\n'
+    buffer += this.center('LUIZAO-LANCHES').toUpperCase() + '\n\n'
+    buffer += this.center('ENTREGA').toUpperCase() + '\n\n'
+    buffer += this.center('OURO FINO - MG') + '\n\n'
+    buffer += this.center(`PEDIDO Nº ${pedido.id}`) + '\n\n'
+    buffer += 'CLIENTE: ' + (pedido.cliente || '-') + '\n\n'
     if (pedido.tipoentrega === 'entrega') {
       const endereco = this.getEndereco(pedido)
       if (endereco) {
-        buffer += 'ENDERECO: ' + endereco + '\n'
+        buffer += 'ENDEREÇO: ' + endereco.toUpperCase() + '\n\n'
       }
     }
-    buffer += this.divider('-') + '\n'
-    buffer += this.center('ITENS') + '\n'
-    buffer += this.divider() + '\n'
+    buffer += this.center('ITENS') + '\n\n'
     if (pedido.itens && pedido.itens.length > 0) {
-      pedido.itens.forEach((item: any, idx: number) => {
-        if (idx > 0) buffer += '\n'
+      pedido.itens.forEach((item: any) => {
         const quantidade = item.quantidade || 1
-        buffer += `${quantidade}x ${item.nome}\n`
+        buffer += `${quantidade}x ${item.nome.toUpperCase()}\n`
         if (item.extras && item.extras.length > 0) {
           item.extras.forEach((extra: any) => {
             const nome = typeof extra === 'string' ? extra : extra.nome
-            buffer += `   + ${nome}\n`
+            buffer += `   + ${nome.toUpperCase()}\n`
           })
         }
         if (item.observacoes) {
-          buffer += `   OBS: ${item.observacoes}\n`
+          buffer += `   OBS: ${item.observacoes.toUpperCase()}\n`
         }
+        buffer += '\n'
       })
     }
-    buffer += this.divider() + '\n'
-    buffer += `TOTAL: R$ ${pedido.total.toFixed(2)}\n`
+    buffer += '\n'
+    buffer += '==============================\n'
+    buffer += this.center(`TOTAL: R$ ${pedido.total.toFixed(2)}`).toUpperCase() + '\n'
     if (pedido.formapagamento) {
-      buffer += `PAGAMENTO: ${pedido.formapagamento.toUpperCase()}\n`
+      buffer += this.center(`PAGAMENTO: ${pedido.formapagamento.toUpperCase()}`) + '\n'
       if (pedido.troco && Number(pedido.troco) > 0) {
-        buffer += `TROCO: R$ ${Number(pedido.troco).toFixed(2)}\n`
+        buffer += this.center(`TROCO: R$ ${Number(pedido.troco).toFixed(2)}`) + '\n'
       }
     }
-    buffer += this.divider('-') + '\n'
-    buffer += this.center('NAO E CUPOM FISCAL') + '\n'
-    buffer += '\nNAO E VALIDO COMO\nCOMPROVANTE DE VENDA\n\nNAO E VALIDO COMO\nCUPOM FISCAL\n'
-    buffer += '\n\n\n\n\n\n\n\n\n\n'
+    buffer += '\n==============================\n'
+    buffer += this.center('NÃO É CUPOM FISCAL') + '\n\n'
+    buffer += '\n\n\n'
     return buffer
   }
 
