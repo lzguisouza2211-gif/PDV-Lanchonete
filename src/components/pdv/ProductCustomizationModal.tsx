@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import Select from '../ui/Select'
 import { useSaboresRefrigerante } from '../../hooks/useSaboresRefrigerante'
 
 export type ExtraOption = {
@@ -279,24 +280,15 @@ export default function ProductCustomizationModal({
 
         {/* Preço base - Compacto */}
         {/* Dropdown de sabor de refrigerante */}
-        {isRefrigerante && sabores.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
-              Escolha o sabor
-            </label>
-            <select
-              value={saborSelecionado}
-              onChange={e => setSaborSelecionado(e.target.value)}
-              disabled={loadingSabores}
-              style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ddd', fontSize: 15 }}
-            >
-              <option value="">Selecione o sabor</option>
-              {sabores.map((s: any) => (
-                <option key={s.id} value={s.sabor}>{s.sabor}</option>
-              ))}
-            </select>
-            {loadingSabores && <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>Carregando sabores...</div>}
-          </div>
+        {isRefrigerante && (
+          <Select
+            label="Escolha o sabor"
+            value={saborSelecionado}
+            onChange={e => setSaborSelecionado(e.target.value)}
+            options={sabores.map((s: any) => ({ value: s.sabor, label: s.sabor }))}
+            loading={loadingSabores}
+            disabled={loadingSabores || sabores.length === 0}
+          />
         )}
         <div
           style={{

@@ -206,49 +206,33 @@ class CardapioService {
     const today = new Date().toISOString().slice(0, 10)
     try {
       if (indisponivel) {
-        // Sempre faz select primeiro
-        const { data: selectData, error: selectError } = await supabase
+        // Usa upsert para evitar erro de duplicidade
+        const upsertData = {
+          ingrediente: ingredienteBusca,
+          valid_on: today,
+          indisponivel: true,
+          pg: global ? true : false
+        };
+        const { error: upsertError } = await supabase
           .from('ingredientes_indisponiveis_dia')
-          .select('id, indisponivel')
-          .eq('ingrediente', ingredienteBusca)
-          .eq('valid_on', today)
-        if (selectError) throw selectError
-        if (selectData && selectData.length > 0) {
-          // Se já existe, só faz update se indisponivel for false
-          const row = selectData[0]
-          if (!row.indisponivel) {
-            const { error: updateError } = await supabase
-              .from('ingredientes_indisponiveis_dia')
-              .update({ indisponivel: true })
-              .eq('id', row.id)
-            if (updateError) throw updateError
-          }
-          return
-        } else {
-          // Se não existe, faz insert
-          const insertData = { ingrediente: ingredienteBusca, valid_on: today, indisponivel: true }
-          const { error: insertError } = await supabase
-            .from('ingredientes_indisponiveis_dia')
-            .insert([insertData])
-          if (insertError) throw insertError
-          return
-        }
+          .upsert([upsertData], { onConflict: ['ingrediente', 'valid_on'] });
+        if (upsertError) throw upsertError;
+        return;
       }
-
       // Para marcar como disponível, faz update para indisponivel: false
       const { error } = await supabase
         .from('ingredientes_indisponiveis_dia')
         .update({ indisponivel: false })
         .eq('ingrediente', ingredienteBusca)
-        .eq('valid_on', today)
-      if (error) throw error
+        .eq('valid_on', today);
+      if (error) throw error;
     } catch (error: any) {
-      const msg = error?.message || ''
+      const msg = error?.message || '';
       if (msg.includes("Could not find the table 'public.ingredientes_indisponiveis_dia'")) {
-        throw new Error('Tabela ingredientes_indisponiveis_dia não existe (rode migration 019 no Supabase).')
+        throw new Error('Tabela ingredientes_indisponiveis_dia não existe (rode migration 019 no Supabase).');
       }
-      console.error('❌ Erro ao atualizar ingrediente indisponível:', msg)
-      throw error
+      console.error('❌ Erro ao atualizar ingrediente indisponível:', msg);
+      throw error;
     }
   }
 }
