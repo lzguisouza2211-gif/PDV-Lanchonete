@@ -5,3 +5,10 @@ on whatsapp_notifications
 for insert
 to anon
 with check (true);
+
+
+create policy "anon_can_select_pedidos"
+on pedidos
+for select
+to anon
+using (true);
