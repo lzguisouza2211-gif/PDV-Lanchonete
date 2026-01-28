@@ -29,7 +29,7 @@ export function usePrinter() {
     setStatus((s) => ({ ...s, isLoading: true, error: null }))
 
     try {
-      const content = elginPrinter.generateProducao(pedido)
+      const content = elginPrinter.generateCupomFiscalFake(pedido)
       await printQueue.addJob('producao', { pedido, content }, 3)
 
       setStatus((s) => ({
@@ -40,7 +40,7 @@ export function usePrinter() {
 
       return true
     } catch (error: any) {
-      const errorMessage = error?.message || 'Erro ao imprimir produção'
+      const errorMessage = error?.message || 'Erro ao imprimir completo'
       setStatus((s) => ({
         ...s,
         isLoading: false,

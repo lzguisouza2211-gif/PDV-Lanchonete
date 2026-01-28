@@ -1,3 +1,53 @@
+  /**
+   * Gera formato de impressão no layout "cupom fiscal fake" igual ao da imagem
+   */
+  generateCupomFiscalFake(pedido: Pedido): string {
+    let buffer = ''
+    buffer += this.center('Luizão Lanches').toUpperCase() + '\n'
+    buffer += this.center('Ouro Fino - MG') + '\n'
+    buffer += this.divider('-') + '\n'
+    buffer += this.center('DELIVERY | [Entrega]') + '\n'
+    buffer += this.divider('-') + '\n'
+    const data = pedido.created_at ? new Date(pedido.created_at) : new Date()
+    buffer += `PEDIDO: ${pedido.id || '-'}   DATA: ${data.toLocaleDateString('pt-BR')}   HORA: ${data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}\n`
+    buffer += `CLIENTE: ${(pedido.cliente || '-').toUpperCase()}\n`
+    if (pedido.telefone) buffer += `TELEFONE: ${pedido.telefone}\n`
+    if (pedido.endereco) buffer += `ENDEREÇO: ${this.getEndereco(pedido)}\n`
+    if (pedido.referencia) buffer += `REFERÊNCIA: ${pedido.referencia}\n`
+    buffer += `OPERADOR: 01-LUIZAO\n`
+    buffer += this.divider('-') + '\n'
+    buffer += 'QTD  PRODUTO                    PR.UNIT.  SUBTOTAL\n'
+    buffer += this.divider('-') + '\n'
+
+    let totalProdutos = 0
+    if (pedido.itens && pedido.itens.length > 0) {
+      pedido.itens.forEach((item: any) => {
+        const quantidade = item.quantidade || 1
+        // Nome do produto limitado a 25 caracteres
+        let nome = (item.nome || '').toUpperCase()
+        if (nome.length > 25) nome = nome.slice(0, 25)
+        nome = nome.padEnd(25, ' ')
+        const preco = (item.preco || 0).toFixed(2).padStart(7, ' ')
+        const subtotal = (quantidade * (item.preco || 0)).toFixed(2).padStart(8, ' ')
+        buffer += `${quantidade.toString().padEnd(4, ' ')} ${nome}${preco}${subtotal}\n`
+        totalProdutos += quantidade * (item.preco || 0)
+      })
+    }
+    buffer += this.divider('-') + '\n'
+    buffer += `TOTAL DOS PRODUTOS:           R$ ${totalProdutos.toFixed(2)}\n`
+    buffer += `VALOR DA ENTREGA:             R$ ${(pedido.entrega || 0).toFixed(2)}\n`
+    buffer += this.divider('-') + '\n'
+    buffer += `TOTAL PEDIDO:                 R$ ${pedido.total ? pedido.total.toFixed(2) : '0.00'}\n`
+    buffer += this.divider('-') + '\n'
+    buffer += `FORMA DE PAGTO: ${(pedido.formapagamento || '-').toUpperCase()}\n`
+    buffer += this.divider('-') + '\n'
+    buffer += 'Não é válido como comprovante de venda\n'
+    buffer += 'Não é válido como cupom fiscal\n'
+    buffer += this.divider('-') + '\n'
+    buffer += 'Desenvolvido por: DSoft Informática\n'
+    buffer += '\n\n\n'
+    return buffer
+  }
 /**
  * Serviço de impressão para impressora Elgin i8
  * Usa biblioteca escpos para formatação térmica correta
@@ -191,51 +241,50 @@ class ElginI8Printer {
    * Formata um ticket completo
    */
   generateCompleto(pedido: Pedido): string {
-    let buffer = '\n'
-    buffer += this.center('*** PEDIDO COMPLETO ***') + '\n'
-    buffer += this.divider() + '\n'
-    buffer += '\n'
-    buffer += this.center(`#${pedido.id}`) + '\n'
-    const horario = new Date((pedido.created_at as string) || new Date())
-      .toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-    buffer += this.center(horario) + '\n'
-    buffer += '\n'
-    buffer += `CLIENTE: ${pedido.cliente}\n`
-    if (pedido.tipoentrega === 'entrega') {
-      const endereco = this.getEndereco(pedido)
-      if (endereco) {
-        buffer += `ENDERECO: ${endereco}\n`
-      }
-    }
-    buffer += this.divider() + '\n'
-    buffer += '\n'
-    buffer += 'ITENS:\n'
+    // Novo layout igual ao Cupom Fiscal Fake
+    let buffer = ''
+    buffer += this.center('Luizão Lanches').toUpperCase() + '\n'
+    buffer += this.center('Ouro Fino - MG') + '\n'
+    buffer += this.divider('-') + '\n'
+    buffer += this.center('DELIVERY | [Entrega]') + '\n'
+    buffer += this.divider('-') + '\n'
+    const data = pedido.created_at ? new Date(pedido.created_at) : new Date()
+    buffer += `PEDIDO: ${pedido.id || '-'}   DATA: ${data.toLocaleDateString('pt-BR')}   HORA: ${data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}\n`
+    buffer += `CLIENTE: ${(pedido.cliente || '-').toUpperCase()}\n`
+    if (pedido.telefone) buffer += `TELEFONE: ${pedido.telefone}\n`
+    if (pedido.endereco) buffer += `ENDEREÇO: ${this.getEndereco(pedido)}\n`
+    if (pedido.referencia) buffer += `REFERÊNCIA: ${pedido.referencia}\n`
+    buffer += `OPERADOR: 01-LUIZAO\n`
+    buffer += this.divider('-') + '\n'
+    buffer += 'QTD  PRODUTO                    PR.UNIT.  SUBTOTAL\n'
+    buffer += this.divider('-') + '\n'
+
+    let totalProdutos = 0
     if (pedido.itens && pedido.itens.length > 0) {
       pedido.itens.forEach((item: any) => {
         const quantidade = item.quantidade || 1
-        buffer += `${quantidade}x ${item.nome}\n`
-        if (item.extras && item.extras.length > 0) {
-          item.extras.forEach((extra: any) => {
-            const nome = typeof extra === 'string' ? extra : extra.nome
-            buffer += `   + ${nome}\n`
-          })
-        }
-        if (item.observacoes) {
-          buffer += `   OBS: ${item.observacoes}\n`
-        }
+        // Nome do produto limitado a 25 caracteres
+        let nome = (item.nome || '').toUpperCase()
+        if (nome.length > 25) nome = nome.slice(0, 25)
+        nome = nome.padEnd(25, ' ')
+        const preco = (item.preco || 0).toFixed(2).padStart(7, ' ')
+        const subtotal = (quantidade * (item.preco || 0)).toFixed(2).padStart(8, ' ')
+        buffer += `${quantidade.toString().padEnd(4, ' ')} ${nome}${preco}${subtotal}\n`
+        totalProdutos += quantidade * (item.preco || 0)
       })
     }
-    buffer += '\n'
-    buffer += this.divider() + '\n'
-    buffer += `TOTAL: R$ ${pedido.total.toFixed(2)}\n`
-    if (pedido.formapagamento) {
-      buffer += `PAGAMENTO: ${pedido.formapagamento}\n`
-    }
-    if (pedido.troco && Number(pedido.troco) > 0) {
-      buffer += `TROCO: R$ ${Number(pedido.troco).toFixed(2)}\n`
-    }
-    buffer += '\n'
-    buffer += this.center('OBRIGADO!') + '\n'
+    buffer += this.divider('-') + '\n'
+    buffer += `TOTAL DOS PRODUTOS:           R$ ${totalProdutos.toFixed(2)}\n`
+    buffer += `VALOR DA ENTREGA:             R$ ${(pedido.entrega || 0).toFixed(2)}\n`
+    buffer += this.divider('-') + '\n'
+    buffer += `TOTAL PEDIDO:                 R$ ${pedido.total ? pedido.total.toFixed(2) : '0.00'}\n`
+    buffer += this.divider('-') + '\n'
+    buffer += `FORMA DE PAGTO: ${(pedido.formapagamento || '-').toUpperCase()}\n`
+    buffer += this.divider('-') + '\n'
+    buffer += 'Não é válido como comprovante de venda\n'
+    buffer += 'Não é válido como cupom fiscal\n'
+    buffer += this.divider('-') + '\n'
+    buffer += 'Desenvolvido por: DSoft Informática\n'
     buffer += '\n\n\n'
     return buffer
   }
