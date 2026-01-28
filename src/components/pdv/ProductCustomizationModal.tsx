@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import Select from '../ui/Select'
 import { useSaboresRefrigerante } from '../../hooks/useSaboresRefrigerante'
+import { useSaboresDelValle } from '../../hooks/useSaboresDelValle'
+
+const PLACEHOLDER_POR_CATEGORIA: Record<string, string> = {
+  Lanches: 'Ex: ponto da carne',
+  Macarrão: 'Ex: Dividir ao meio',
+  Porções: 'Ex: sem cebola, ponto da carne, retirar tomate',
+  Omeletes: 'Ex: diminuir quantidade de ovos',
+  Bebidas: 'Ex: sem gelo',
+  Cervejas: 'Ex: gelada, sem gelo',
+  Doce: 'Ex: sem canela, mais calda'
+}
 
 export type ExtraOption = {
   id: string
@@ -40,9 +51,9 @@ export default function ProductCustomizationModal({
   onConfirm,
 }: ProductCustomizationModalProps) {
   const [extrasSelecionados, setExtrasSelecionados] = useState<string[]>([])
-  // Dropdown de sabor de refrigerante
+  // Dropdown de sabor de refrigerante ou del valle
   const isRefrigerante = produto.categoria?.toLowerCase?.() === 'refrigerante' || produto.nome?.toLowerCase?.().includes('refrigerante')
-  // Tenta inferir tipo do produto pelo nome, se não vier explicitamente
+  const isDelValle = produto.categoria?.toLowerCase?.() === 'del valle' || produto.nome?.toLowerCase?.().includes('del valle')
   let tipoRefrigerante = produto.tipo || ''
   if (!tipoRefrigerante && isRefrigerante) {
     const nome = produto.nome?.toLowerCase?.() || ''
@@ -51,7 +62,8 @@ export default function ProductCustomizationModal({
     else if (nome.includes('lata')) tipoRefrigerante = 'lata'
     else tipoRefrigerante = 'lata'
   }
-  const { sabores, loading: loadingSabores } = useSaboresRefrigerante(tipoRefrigerante)
+  const { sabores: saboresRefrigerante, loading: loadingSaboresRefrigerante } = useSaboresRefrigerante(tipoRefrigerante)
+  const { sabores: saboresDelValle, loading: loadingSaboresDelValle } = useSaboresDelValle()
   const [saborSelecionado, setSaborSelecionado] = useState<string>('')
   const [ingredientesRemovidos, setIngredientesRemovidos] = useState<string[]>([])
   const [observacoes, setObservacoes] = useState('')
@@ -191,7 +203,7 @@ export default function ProductCustomizationModal({
     ]
 
     let obs = observacoes.trim()
-    if (isRefrigerante && saborSelecionado) {
+    if ((isRefrigerante || isDelValle) && saborSelecionado) {
       obs = `Sabor: ${saborSelecionado}` + (obs ? ` | ${obs}` : '')
     }
     onConfirm({
@@ -209,6 +221,10 @@ export default function ProductCustomizationModal({
   }
 
   if (!isOpen) return null
+
+  const placeholderObservacoes =
+      PLACEHOLDER_POR_CATEGORIA[produto.categoria || ''] ||
+      'Digite aqui alguma observação...'
 
   return (
     <>
@@ -279,15 +295,22 @@ export default function ProductCustomizationModal({
         </div>
 
         {/* Preço base - Compacto */}
-        {/* Dropdown de sabor de refrigerante */}
-        {isRefrigerante && (
+        {/* Dropdown de sabor de refrigerante ou del valle */}
+        {(isRefrigerante || isDelValle) && (
           <Select
             label="Escolha o sabor"
             value={saborSelecionado}
             onChange={e => setSaborSelecionado(e.target.value)}
-            options={sabores.map((s: any) => ({ value: s.sabor, label: s.sabor }))}
-            loading={loadingSabores}
-            disabled={loadingSabores || sabores.length === 0}
+            options={
+              isRefrigerante
+                ? saboresRefrigerante.map((s: any) => ({ value: s.sabor, label: s.sabor }))
+                : saboresDelValle.map((s: any) => ({ value: s.sabor, label: s.sabor }))
+            }
+            loading={isRefrigerante ? loadingSaboresRefrigerante : loadingSaboresDelValle}
+            disabled={
+              (isRefrigerante && (loadingSaboresRefrigerante || saboresRefrigerante.length === 0)) ||
+              (isDelValle && (loadingSaboresDelValle || saboresDelValle.length === 0))
+            }
           />
         )}
         <div
@@ -601,7 +624,7 @@ export default function ProductCustomizationModal({
           <textarea
             value={observacoes}
             onChange={(e) => setObservacoes(e.target.value)}
-            placeholder="Ex: Bem passado..."
+            placeholder={placeholderObservacoes}
             rows={2}
             style={{
               width: '100%',
