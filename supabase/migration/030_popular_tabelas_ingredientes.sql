@@ -1,3 +1,6 @@
+-- Migration 030
+-- Popula as tabelas auxiliares de ingredientes.
+-- Data: 2026-01-28
 -- Migration: Popular tabelas de ingredientes
 -- Estratégia: Lanches, Macarrão e Omeletes recebem opções de adicionar e remover
 -- Porções não recebem (já vêm com tudo pré-definido)

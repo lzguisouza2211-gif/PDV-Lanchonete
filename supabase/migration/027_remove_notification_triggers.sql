@@ -1,3 +1,6 @@
+-- Migration 027
+-- Remove triggers de notificação não utilizadas.
+-- Data: 2026-01-28
 -- Remove todos os triggers de notificação que dependem do schema 'net'
 -- Mantém apenas o trigger de updated_at que funciona corretamente
 

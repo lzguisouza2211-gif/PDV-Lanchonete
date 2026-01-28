@@ -1,3 +1,6 @@
+-- Migration 032
+-- Unifica notificações do WhatsApp em uma tabela.
+-- Data: 2026-01-28
 -- ============================================
 -- Migration 039: Unificação completa do sistema WhatsApp
 -- 

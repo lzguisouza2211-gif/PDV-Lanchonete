@@ -1,3 +1,6 @@
+-- Migration 013
+-- Adiciona restrição de data única para fechamentos de caixa.
+-- Data: 2026-01-28
 -- ============================================
 -- CONSTRAINT UNIQUE PARA FECHAMENTOS DE CAIXA
 -- ============================================

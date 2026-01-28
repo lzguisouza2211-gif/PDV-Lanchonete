@@ -1,3 +1,6 @@
+-- Migration 028
+-- Corrige separação de ingredientes em registros antigos.
+-- Data: 2026-01-28
 -- Corrige separadores de ingredientes na descrição
 -- Substitui " e " por ", " para padronizar o separador
 

@@ -1,3 +1,6 @@
+-- Migration 046
+-- Policies para produtos_disponibilidade e integração WhatsApp.
+-- Data: 2026-01-28
 -- POLICIES para whatsapp_notifications
 -- Permite leitura para todos, escrita apenas para funções/autorizados
 

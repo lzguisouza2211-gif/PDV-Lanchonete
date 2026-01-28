@@ -1,3 +1,6 @@
+-- Migration 035
+-- Adiciona suporte a emojis em mensagens WhatsApp.
+-- Data: 2026-01-28
 CREATE OR REPLACE FUNCTION public.format_pedido_itens(itens JSONB)
 RETURNS TEXT
 LANGUAGE plpgsql

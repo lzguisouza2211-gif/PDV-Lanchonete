@@ -1,3 +1,6 @@
+-- Migration 043
+-- Popula a tabela de adicionais de produtos.
+-- Data: 2026-01-28
 -- Popula a tabela adicional com os ingredientes dos adicionais SIMPLES e ESPECIAL para todos os produtos customizáveis
 -- Execute este script após atualizar a tabela cardapio
 

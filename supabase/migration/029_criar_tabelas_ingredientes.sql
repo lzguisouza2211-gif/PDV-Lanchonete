@@ -1,3 +1,6 @@
+-- Migration 029
+-- Criação das tabelas de ingredientes auxiliares.
+-- Data: 2026-01-28
 -- Migration: Criar tabelas para ingredientes adicionáveis e removíveis
 -- Data: 2026-01-19
 

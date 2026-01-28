@@ -1,3 +1,6 @@
+-- Migration 042
+-- Atualiza o cardápio de lanches para o ano de 2026.
+-- Data: 2026-01-28
 -- Atualiza nomes e valores dos produtos do cardápio conforme JSON fornecido em 26/01/2026
 -- Mantém categorias, converte nome para minúsculo, não altera mais nada
 

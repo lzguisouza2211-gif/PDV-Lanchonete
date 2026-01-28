@@ -1,3 +1,6 @@
+-- Migration 031
+-- Adiciona tabela/configuração de taxa de entrega (delivery fee).
+-- Data: 2026-01-28
 -- Criar tabela para armazenar configurações de taxa de entrega
 CREATE TABLE IF NOT EXISTS delivery_config (
   id BIGINT PRIMARY KEY DEFAULT 1,

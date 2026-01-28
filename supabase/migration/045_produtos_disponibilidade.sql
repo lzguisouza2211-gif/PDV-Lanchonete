@@ -1,3 +1,6 @@
+-- Migration 045
+-- Adiciona controle de disponibilidade para produtos do cardápio.
+-- Data: 2026-01-28
 -- Tabela para gerenciar disponibilidade de produtos por categoria, sabor e tipo
 CREATE TABLE IF NOT EXISTS public.produtos_disponibilidade (
     id SERIAL PRIMARY KEY,

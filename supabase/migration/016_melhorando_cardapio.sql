@@ -1,3 +1,6 @@
+-- Migration 016
+-- Melhorias na estrutura da tabela cardápio.
+-- Data: 2026-01-28
 UPDATE cardapio
 SET ingredientes = CASE nome
 

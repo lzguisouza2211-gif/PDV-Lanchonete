@@ -1,3 +1,6 @@
+-- Migration 051
+-- Policies para inserção de dados relacionados ao WhatsApp.
+-- Data: 2026-01-28
 --cria police para anon inserir na tabela wpp
 
 create policy "anon_can_insert_whatsapp_notifications"

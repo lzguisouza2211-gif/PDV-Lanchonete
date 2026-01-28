@@ -1,3 +1,6 @@
+-- Migration 026
+-- Criação de triggers para debug e auditoria.
+-- Data: 2026-01-28
 -- Verificar todos os triggers na tabela pedidos
 SELECT 
     t.tgname AS trigger_name,

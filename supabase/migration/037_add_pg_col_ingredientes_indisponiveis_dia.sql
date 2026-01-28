@@ -1,3 +1,6 @@
+-- Migration 037
+-- Adiciona coluna 'pg' na tabela ingredientes_indisponiveis_dia.
+-- Data: 2026-01-28
 -- Migration 044: Adiciona coluna 'pg' (boolean) na tabela ingredientes_indisponiveis_dia
 -- true = permite troca grátis, false = não permite
 

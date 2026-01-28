@@ -1,3 +1,6 @@
+-- Migration 038
+-- Corrige valores nulos na coluna 'indisponivel' da tabela ingredientes_indisponiveis_dia.
+-- Data: 2026-01-28
 -- Migration 045; para garantir que todos os registros existentes tenham valor correto na coluna 'indisponivel'
 -- (Opcional, caso precise corrigir dados legados)
 

@@ -1,3 +1,6 @@
+-- Migration 034
+-- Criação de template para mensagens WhatsApp.
+-- Data: 2026-01-28
 -- ============================================
 -- Migration 041: Template WhatsApp atualizado
 -- Remove número do pedido, remove tempo estimado, valor formatado como real

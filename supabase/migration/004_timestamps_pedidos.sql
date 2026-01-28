@@ -9,9 +9,10 @@ add column if not exists created_at timestamptz not null default now();
 -- 2. updated_at (última atualização)
 alter table public.pedidos
 add column if not exists updated_at timestamptz not null default now();
+-- Migration 004
+-- Adiciona colunas de timestamp e trigger de atualização automática na tabela pedidos.
+-- Data: 2026-01-28
 
--- ============================================
--- TRIGGER PARA updated_at
 -- ============================================
 
 create or replace function public.set_updated_at()

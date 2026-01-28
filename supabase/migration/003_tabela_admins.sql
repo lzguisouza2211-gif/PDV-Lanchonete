@@ -1,4 +1,6 @@
---criando tabela admins
+-- Migration 003
+-- Criação da tabela de administradores do sistema.
+-- Data: 2026-01-28
 create table if not exists admins (
   id bigint generated always as identity primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -15,7 +17,6 @@ create table if not exists admins (
 
 alter table admins enable row level security;
 
---policies
 create policy "admin_read_own_data"
 on admins
 for select

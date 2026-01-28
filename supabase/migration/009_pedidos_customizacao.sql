@@ -1,3 +1,6 @@
+-- Migration 009
+-- Adiciona customização de pedidos (campos extras ou ajustes).
+-- Data: 2026-01-28
 -- ============================================
 -- ADICIONAR CAMPOS DE CUSTOMIZAÇÃO AOS PEDIDOS
 -- ============================================

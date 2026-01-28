@@ -1,3 +1,6 @@
+-- Migration 044
+-- Atualiza tipos de pão nos lanches do cardápio.
+-- Data: 2026-01-28
 -- Migration para atualizar descrições dos produtos de Lanches com tipo de pão
 -- Data: 26/01/2026
 

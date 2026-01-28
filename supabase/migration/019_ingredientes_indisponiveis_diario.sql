@@ -1,3 +1,6 @@
+-- Migration 019
+-- Criação da tabela de ingredientes indisponíveis por dia.
+-- Data: 2026-01-28
 -- Migration 019: Ingredientes indisponíveis por dia
 
 create table ingredientes_indisponiveis_dia (

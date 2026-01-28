@@ -1,3 +1,6 @@
+-- Migration 050
+-- Atualiza ingredientes de pão de hambúrguer robusto.
+-- Data: 2026-01-28
 -- Atualiza qualquer ocorrência de "pao" ou "pão" para "pao hamburguer" no array ingredientes
 -- Funciona para arrays com múltiplos ingredientes
 

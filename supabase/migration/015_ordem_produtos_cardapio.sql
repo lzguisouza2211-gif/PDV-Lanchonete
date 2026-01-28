@@ -1,3 +1,6 @@
+-- Migration 015
+-- Adiciona campo de ordenação para produtos do cardápio.
+-- Data: 2026-01-28
 -- 1️⃣ Criar coluna de ordem da categoria
 alter table cardapio
 add column ordem_categoria integer;

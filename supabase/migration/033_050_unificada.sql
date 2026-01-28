@@ -1,3 +1,6 @@
+-- Migration 033
+-- Unificação de migrations intermediárias (ajustes diversos).
+-- Data: 2026-01-28
 -- ============================================
 -- Migration Unificada: 040-050
 -- Inclui todas as alterações das migrations 040 a 050

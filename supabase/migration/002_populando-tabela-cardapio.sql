@@ -1,7 +1,8 @@
--- Migration: popular tabela cardapio (preços atualizados conforme imagem 09-01-2026)
+-- Migration 002
+-- Popula a tabela cardapio com os produtos e preços iniciais do sistema.
+-- Data: 2026-01-28
 
 insert into cardapio (categoria, nome, preco, descricao) values
--- Lanches
 ('Lanches', 'Hambúrguer', 21.00, 'pao de hamburguer, tomate, maionese e hamburguer'),
 ('Lanches', 'Calabresa', 26.00, 'pao frances, tomate e calabresa'),
 ('Lanches', 'X-Calabresa', 28.00, 'pao frances, tomate, cebola, calabresa e mussarela'),
@@ -33,26 +34,22 @@ insert into cardapio (categoria, nome, preco, descricao) values
 ('Lanches', 'Pernil no prato', 41.50, 'alface, tomate, batata, pernil, cebola, bacon e mussarela'),
 ('Lanches', 'Churrasco de Contra File', 55.00, 'pao frances, tomate, cebola, contra-file e mussarela'),
 
--- Macarrão na Chapa
 ('Macarrão', 'Calabresa', 22.00, 'macarrao, milho, bacon, cebola, molho e mussarela'),
 ('Macarrão', 'Pernil', 24.00, 'macarrao, milho, bacon, cebola, molho e mussarela'),
 ('Macarrão', 'Frango', 24.00, 'macarrao, milho, bacon, cebola, molho e mussarela'),
 ('Macarrão', 'Bolonhesa', 23.00, 'macarrao, hamburguer, molho, cebola, milho e mussarela'),
 
--- Porções
 ('Porções', 'Batata simples', 24.00, NULL),
 ('Porções', 'Batata c/ queijo e bacon', 38.50, NULL),
 ('Porções', 'Calabresa e cebola', 41.00, NULL),
 ('Porções', 'Pernil e cebola', 55.00, NULL),
 ('Porções', 'Contra-filé', 90.00, NULL),
 
--- Omeletes
 ('Omeletes', 'Da Casa', 23.00, 'quatro ovos, presunto, queijo, batata, milho e cebola'),
 ('Omeletes', 'Catupiry', 26.00, 'quatro ovos, catupiry, milho, bacon, presunto, queijo, batata e cebola'),
 ('Omeletes', 'Cheddar', 26.00, 'quatro ovos, cheddar, milho, bacon, presunto, queijo, batata e cebola'),
 ('Omeletes', 'Frango', 27.00, 'quatro ovos, frango, milho, bacon, presunto, queijo, batata e cebola'),
 
--- Bebidas
 ('Bebidas', 'Coquinha 200ml', 4.00, NULL),
 ('Bebidas', 'Coca lata sabores', 7.00, NULL),
 ('Bebidas', 'Del Vale lata sabores', 7.00, NULL),
@@ -68,7 +65,6 @@ insert into cardapio (categoria, nome, preco, descricao) values
 ('Bebidas', 'Manga', 12.00, NULL),
 ('Bebidas', 'Maracuja', 12.00, NULL),
 
--- Cervejas e Águas
 ('Cervejas', 'Brahma lata', 7.00, NULL),
 ('Cervejas', 'Skol lata', 7.00, NULL),
 ('Cervejas', 'Skol litrinho', 7.00, NULL),
@@ -76,5 +72,4 @@ insert into cardapio (categoria, nome, preco, descricao) values
 ('Cervejas', 'Água com gás', 4.50, NULL),
 ('Cervejas', 'Água sem gás', 4.00, NULL),
 
--- Doces
 ('Doces', 'Bombom caseiro', 6.00, NULL);

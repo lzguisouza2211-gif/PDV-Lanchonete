@@ -1,3 +1,6 @@
+-- Migration 023
+-- Criação de índices para melhorar a performance de consultas.
+-- Data: 2026-01-28
 -- Migration 020: Índices para performance do cardápio
 CREATE INDEX IF NOT EXISTS idx_cardapio_ativo ON cardapio(ativo);
 CREATE INDEX IF NOT EXISTS idx_cardapio_disponivel ON cardapio(disponivel);

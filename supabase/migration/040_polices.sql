@@ -1,3 +1,6 @@
+-- Migration 040
+-- Ajustes e criação de novas policies de segurança.
+-- Data: 2026-01-28
 -- Permitir SELECT para admins ativos
 CREATE POLICY admin_select_ingredientes_indisponiveis
 ON public.ingredientes_indisponiveis_dia
