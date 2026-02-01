@@ -2,7 +2,7 @@
  * Serviço de API para comunicação com impressora
  * Pode ser expandido para integração com servidor backend
  */
-
+// Arquivo removido. Impressão agora é feita diretamente via escpos e templates novos.
 export interface PrintRequest {
   content: string
   printerName?: string
@@ -23,7 +23,7 @@ export async function sendToPrinter(
 ): Promise<PrintResponse> {
   try {
     // Tenta enviar para uma API de impressão backend
-    const response = await fetch('/api/print', {
+    const response = await fetch('http://localhost:4000/api/print', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

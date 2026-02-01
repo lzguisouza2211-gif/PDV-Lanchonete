@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { pedidosService,  Pedido } from '../services/api/pedidos.service'
+import { pedidoItensService } from '../services/api/pedido_itens.service'
 import { supabase } from '../services/supabaseClient'
 
 export default function usePedidos() {
@@ -74,11 +75,20 @@ export default function usePedidos() {
       setLoading(true)
       setError(null)
 
-      console.log('🔵 [criarPedido] Enviando payload:', JSON.stringify(pedido, null, 2))
 
+      // Log detalhado do payload antes do insert
+      console.log('🔵 [criarPedido] Payload original:', JSON.stringify(pedido, null, 2))
+      const { itens, ...pedidoData } = pedido
+      const pedidoComItens = { ...pedidoData, itens }
+      console.log('🔵 [criarPedido] Payload para insert:', JSON.stringify(pedidoComItens, null, 2))
+
+
+      // Garante que o campo itens será enviado no insert
+
+      // Cria o pedido (com os itens no campo jsonb)
       const { data, error } = await supabase
         .from('pedidos')
-        .insert([pedido])
+        .insert([pedidoComItens])
         .select()
         .single()
 
@@ -105,6 +115,23 @@ export default function usePedidos() {
         setError(new Error('Pedido criado mas nenhum dado retornado'))
         setLoading(false)
         return false
+      }
+
+      // Insere os itens na tabela pedido_itens
+      // Evita inserir itens duplicados se trigger já populou
+      const { data: itensExistentes, error: erroBuscaItens } = await supabase
+        .from('pedido_itens')
+        .select('id')
+        .eq('pedido_id', data.id)
+      if (!erroBuscaItens && Array.isArray(itensExistentes) && itensExistentes.length > 0) {
+        console.warn('[DUPLICIDADE] Itens já existem para o pedido', data.id, itensExistentes)
+      } else if (Array.isArray(itens) && itens.length > 0) {
+        const ok = await pedidoItensService.inserirItens(data.id, itens)
+        if (!ok) {
+          setError(new Error('Pedido criado mas falha ao inserir itens'))
+          setLoading(false)
+          return false
+        }
       }
 
       setLoading(false)
