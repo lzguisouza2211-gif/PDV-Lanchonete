@@ -1,0 +1,55 @@
+# Mapeamento de renumeração de migrations (2026-01-28)
+
+| Nova Numeração | Nome Antigo |
+|---|---|
+| 001 | 001_criacao-de-tabelas.sql |
+| 002 | 002_populando-tabela-cardapio.sql |
+| 003 | 003_tabela_admins.sql |
+| 004 | 004_timestamps_pedidos.sql |
+| 005 | 0045_fix_indisponivel_col_ingredientes_indisponiveis_dia.sql |
+| 006 | 005_policies_rls.sql |
+| 007 | 006_whatsapp_n8n_trigger.sql |
+| 008 | 007_tabela_fechamentos_caixa.sql |
+| 009 | 008_store_status.sql |
+| 010 | 009_pedidos_customizacao.sql |
+| 011 | 010_product_addons.sql |
+| 012 | 011_popular_product_addons.sql |
+| 013 | 012_cardapio_ingredientes.sql |
+| 014 | 013_fechamentos_unique_date.sql |
+| 015 | 014_popular_ingredientes.sql |
+| 016 | 015_ordem_produtos_cardapio.sql |
+| 017 | 016_melhorando_cardapio.sql |
+| 018 | 017_disponibilidade_produtos.sql |
+| 019 | 018_policies_cardapio_update.sql |
+| 020 | 019_ingredientes_indisponiveis_diario.sql |
+| 021 | 020_telefone_e_notificacao_status.sql |
+| 022 | 021_whatsapp_queue.sql |
+| 023 | 022_whatsapp_templates.sql |
+| 024 | 023_index_performance.sql |
+| 025 | 024_remove_confirmacao_status.sql |
+| 026 | 025_add_telefone_pedidos.sql |
+| 027 | 026_debug_triggers.sql |
+| 028 | 027_remove_notification_triggers.sql |
+| 029 | 028_fix_ingredientes_separados.sql |
+| 030 | 030_criar_tabelas_ingredientes.sql |
+| 031 | 031_popular_tabelas_ingredientes.sql |
+| 032 | 032_delivery_fee.sql |
+| 033 | 039_unified_whatsapp_notifications.sql |
+| 034 | 040_050_unificada.sql |
+| 035 | 041_template_whtsapp.sql |
+| 036 | 042_emoji_wpp.sql |
+| 037 | 043_ingredientes_indisponivel.sql |
+| 038 | 044_add_pg_col_ingredientes_indisponiveis_dia.sql |
+| 039 | 046_popular_ingredientes_padronizados.sql |
+| 040 | 048_polices.sql |
+| 041 | 049_remove_cardapio_id_ingredientes_indisponiveis_dia.sql |
+| 042 | 050_atualiza_cardapio_lanches_2026.sql |
+| 043 | 051_popula_adicionais.sql |
+| 044 | 052_atualiza_tipo_pao_lanches.sql |
+| 045 | 053_produtos_disponibilidade.sql |
+| 046 | 054_policies_produtos_disponibilidade_whatsapp.sql |
+| 047 | 055_lowercase_ingredientes_indisponiveis_dia.sql |
+| 048 | 056_fix_unique_ingredientes_indisponiveis.sql |
+| 049 | 057_update_ingredientes_pao_hamburguer.sql |
+| 050 | 058_update_ingredientes_pao_hamburguer_robusto.sql |
+| 051 | 059_polices_wpp_insert.sql |

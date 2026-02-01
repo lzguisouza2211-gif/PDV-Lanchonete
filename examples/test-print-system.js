@@ -11,8 +11,7 @@
 console.log('🔍 Verificando sistema de impressão...')
 
 // Teste 1: Ver status da fila
-import { printQueue } from './services/printer/printQueue'
-console.log('📋 Status da fila:', printQueue.getQueueStatus())
+// printQueue removido: utilize os novos templates de impressão
 
 // ============================================
 // 2. CRIAR PEDIDO FAKE PARA TESTE
@@ -63,18 +62,13 @@ console.log('✅ Pedido criado para teste:', pedidoTeste)
 // 3. TESTAR IMPRESSÃO DE PRODUÇÃO
 // ============================================
 console.log('\n🖨️ TESTE 1: Impressão de Produção')
-import { elginPrinter } from './services/printer/elginPrinter'
-const producaoContent = elginPrinter.generateProducao(pedidoTeste)
-console.log('Conteúdo gerado:')
-console.log(producaoContent)
+// elginPrinter removido: utilize os novos templates de impressão
 
 // ============================================
 // 4. TESTAR IMPRESSÃO DE MOTOBOY
 // ============================================
 console.log('\n🖨️ TESTE 2: Impressão de Motoboy')
-const motoboyContent = elginPrinter.generateMotoboy(pedidoTeste)
-console.log('Conteúdo gerado:')
-console.log(motoboyContent)
+// elginPrinter removido: utilize os novos templates de impressão
 
 // ============================================
 // 5. TESTAR IMPRESSÃO COMPLETA
@@ -178,9 +172,7 @@ printQueue.clearQueue()
 // Marcar impressora como pronta
 printQueue.setPrinterReady(true)
 
-// Testar um pedido específico
-const pedido = { id: 1, cliente: 'Teste', itens: [], total: 50 }
-elginPrinter.generateProducao(pedido)
+// elginPrinter removido: utilize os novos templates de impressão
 
 // Testar impressão no navegador
 window.open('about:blank').document.write('<pre>Seu conteúdo aqui</pre>')
@@ -192,3 +184,9 @@ window.open('about:blank').document.write('<pre>Seu conteúdo aqui</pre>')
 console.log('\n🧹 Para limpar tudo e recomeçar:')
 console.log('1. Recarregue a página (F5)')
 console.log('2. Ou execute: printQueue.clearQueue()')
+
+
+// =============================
+// EXEMPLO: Impressão ESC/POS real
+// =============================
+// Exemplo de uso dos novos templates de impressão está disponível nos arquivos de serviço.

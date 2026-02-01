@@ -1,3 +1,6 @@
+-- Migration 017
+-- Adiciona controle de disponibilidade de produtos.
+-- Data: 2026-01-28
 -- Migration 017: Adicionar coluna 'disponivel' na tabela cardapio
 -- Para permitir gestão rápida de disponibilidade de produtos
 

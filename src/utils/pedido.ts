@@ -109,14 +109,15 @@ export function normalizePedidoPayload(
     total: Number(total.toFixed(2)),
     taxa_entrega: Number(taxaEntrega.toFixed(2)),
     user_id: input.user_id || null,
-    itens: items.map((item) => ({
+    itens: items.map(item => ({
       nome: item.name,
-      preco: Number(item.price),
-      quantidade: Number(item.qty),
+      preco: item.price,
+      quantidade: item.qty,
       categoria: item.categoria,
       observacoes: item.observacoes,
-      ingredientes_indisponiveis: item.ingredientes_indisponiveis,
-      extras: item.extras,
+      adicionais: (item.extras || []).filter(e => e.tipo === 'add'),
+      retirados: (item.extras || []).filter(e => e.tipo === 'remove'),
+      // Não envia extras nem ingredientes_indisponiveis diretamente
     })),
   }
 }

@@ -48,7 +48,7 @@ export default function PedidosAdmin() {
     }
   }, [])
 
-  // 📥 Carregar pedidos iniciais com otimização
+  // 📥 Carregar pedidos iniciais com itens
   useEffect(() => {
     if (initializedRef.current) return
     initializedRef.current = true
@@ -63,7 +63,22 @@ export default function PedidosAdmin() {
           .limit(50)
 
         if (!error && data) {
-          setPedidos(data)
+          // Buscar itens para cada pedido
+          const pedidosComItens = await Promise.all(
+            data.map(async (pedido: any) => {
+              const { data: itens, error: errorItens } = await supabase
+                .from('pedido_itens')
+                .select('*')
+                .eq('pedido_id', pedido.id)
+                .order('id', { ascending: true })
+              console.log('[DEBUG] Itens buscados para pedido', pedido.id, itens)
+              return {
+                ...pedido,
+                itens: !errorItens && itens ? itens : [],
+              }
+            })
+          )
+          setPedidos(pedidosComItens)
         }
       } catch (error) {
         console.error('Erro ao carregar pedidos:', error)
@@ -85,10 +100,16 @@ export default function PedidosAdmin() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'pedidos' },
-        (payload) => {
+        async (payload) => {
           console.log('🆕 Novo pedido recebido via realtime:', payload.new)
           const novoPedido = payload.new as any
-          addPedido(novoPedido)
+          // Buscar itens do novo pedido
+          const { data: itens, error: errorItens } = await supabase
+            .from('pedido_itens')
+            .select('*')
+            .eq('pedido_id', novoPedido.id)
+            .order('id', { ascending: true })
+          addPedido({ ...novoPedido, itens: !errorItens && itens ? itens : [] })
 
           // 🔔 Notificação do navegador
           if (Notification.permission === 'granted') {
@@ -117,7 +138,7 @@ export default function PedidosAdmin() {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'pedidos' },
-        (payload) => {
+        async (payload) => {
           // Evita dupla atualização quando fazemos a mudança localmente
           const pedidoId = payload.new.id
           if (statusChangeRef.current[pedidoId]) {
@@ -127,40 +148,52 @@ export default function PedidosAdmin() {
             }, 100)
             return
           }
-          updatePedido(payload.new as any)
+          // Buscar itens atualizados do pedido
+          const { data: itens, error: errorItens } = await supabase
+            .from('pedido_itens')
+            .select('*')
+            .eq('pedido_id', pedidoId)
+            .order('id', { ascending: true })
+          updatePedido({ ...payload.new, itens: !errorItens && itens ? itens : [] })
         }
       )
 
-      .subscribe()
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'pedidos' },
+        async (payload) => {
+          console.log('🆕 Novo pedido recebido via realtime:', payload.new)
+          const novoPedido = payload.new as any
+          // Buscar itens do novo pedido
+          const { data: itens, error: errorItens } = await supabase
+            .from('pedido_itens')
+            .select('*')
+            .eq('pedido_id', novoPedido.id)
+            .order('id', { ascending: true })
+          addPedido({ ...novoPedido, itens: !errorItens && itens ? itens : [] })
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [addPedido, updatePedido])
-
-  useEffect(() => {
-    if (!('Notification' in window)) {
-      return
-    }
-
-    if (Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
-  }, [])
-
-  // Função para atualizar status do pedido (definir ANTES do useMemo)
-  const handleChangeStatus = useCallback(
-    async (id: number, novoStatus: string) => {
-      try {
-        // Marca que foi mudança local para evitar dupla atualização do realtime
-        statusChangeRef.current[id] = novoStatus
-
-        // Atualização otimista na UI
-        const pedidoAtual = pedidos.find(p => p.id === id)
-        if (pedidoAtual) {
-          updatePedido({ ...pedidoAtual, status: novoStatus })
+          // 🔔 Notificação do navegador
+          if (Notification.permission === 'granted') {
+            new Notification('🍔 Novo pedido recebido!', {
+              body: `Cliente: ${novoPedido.cliente}\nTotal: R$ ${Number(
+                novoPedido.total
+              ).toFixed(2)}`,
+              icon: '/icon-192.png',
+              badge: '/icon-192.png',
+            })
+          }
+          // 🔊 Som (se desbloqueado)
+          console.log('🔊 Tentando tocar som... Desbloqueado:', audioUnlockedRef.current)
+          if (audioRef.current && audioUnlockedRef.current) {
+            audioRef.current.currentTime = 0
+            audioRef.current.play().catch((err) => {
+              console.error('❌ Erro ao tocar som de notificação:', err)
+            })
+          } else if (!audioUnlockedRef.current) {
+            console.warn('⚠️ Áudio ainda não foi desbloqueado. Clique na página primeiro!')
+          }
         }
-
+      )
         // Atualizar no banco via hook
         const sucesso = await atualizarStatus(id, novoStatus)
 

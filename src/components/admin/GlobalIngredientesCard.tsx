@@ -26,7 +26,7 @@ const GlobalIngredientesCard: React.FC<GlobalIngredientesCardProps> = ({ onToggl
   ];
   return (
     <div className="global-ingredientes-card">
-      <h3>Gestão Global de Ingredientes</h3>
+      <h3>Gestão de Ingredientes</h3>
       <div className="ingredientes-list">
         {todosIngredientes
           .filter((ing) => !bloqueados.includes(ing.toLowerCase().trim()))

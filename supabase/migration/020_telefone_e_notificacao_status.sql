@@ -1,3 +1,6 @@
+-- Migration 020
+-- Adiciona campos de telefone e status de notificação em pedidos.
+-- Data: 2026-01-28
 -- ============================================
 -- Migration 020: Telefone do cliente e notificações WhatsApp por status
 -- ============================================

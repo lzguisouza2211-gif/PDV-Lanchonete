@@ -13,12 +13,12 @@ export const usePedidosStore = create<PedidosState>((set) => ({
   setPedidos: (pedidos) => set({ pedidos }),
   addPedido: (pedido) =>
     set((state) => ({
-      pedidos: [pedido, ...state.pedidos],
+      pedidos: [{ ...pedido, itens: Array.isArray(pedido.itens) ? pedido.itens : [] }, ...state.pedidos],
     })),
   updatePedido: (pedido) =>
     set((state) => ({
       pedidos: state.pedidos.map((p) =>
-        p.id === pedido.id ? pedido : p
+        p.id === pedido.id ? { ...pedido, itens: Array.isArray(pedido.itens) ? pedido.itens : [] } : p
       ),
     })),
 }))

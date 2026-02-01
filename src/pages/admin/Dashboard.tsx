@@ -80,7 +80,7 @@ import { useStoreStatus } from '../../hooks/useStoreStatus'
 import { storeStatusService } from '../../services/storeStatus'
 import OrderMonitor from '../../components/admin/OrderMonitor'
 import QuickMenuManagement from '../../components/admin/QuickMenuManagement'
-import PrintQueueMonitor from '../../components/admin/PrintQueueMonitor'
+// PrintQueueMonitor removido: utilize os novos templates de impressão
 
 export default function Dashboard() {
   const { listPedidos, loading, error } = usePedidos()
@@ -316,7 +316,7 @@ export default function Dashboard() {
 
       {/* MONITOR DE FILA DE IMPRESSÃO */}
       <div style={{ marginBottom: 32 }}>
-        <PrintQueueMonitor />
+        {/* PrintQueueMonitor removido: utilize os novos templates de impressão */}
       </div>
 
       {/* MONITOR DE PEDIDOS */}

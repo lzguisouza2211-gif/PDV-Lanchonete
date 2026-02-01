@@ -1,3 +1,6 @@
+-- Migration 012
+-- Criação da tabela de ingredientes do cardápio.
+-- Data: 2026-01-28
 -- ============================================
 -- ADICIONAR CAMPO INGREDIENTES AO CARDÁPIO
 -- ============================================

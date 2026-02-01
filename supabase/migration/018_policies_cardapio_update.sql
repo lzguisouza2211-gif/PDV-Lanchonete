@@ -1,3 +1,6 @@
+-- Migration 018
+-- Políticas para atualização do cardápio.
+-- Data: 2026-01-28
 -- Migration 018: Adicionar policies de UPDATE para cardapio
 -- Permite que admins atualizem campos como 'disponivel'
 

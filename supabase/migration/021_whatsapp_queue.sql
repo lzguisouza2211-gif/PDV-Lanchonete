@@ -1,3 +1,6 @@
+-- Migration 021
+-- Criação da fila de mensagens do WhatsApp.
+-- Data: 2026-01-28
 -- ============================================
 -- Migration 021: Fila de notificações WhatsApp
 -- ============================================
