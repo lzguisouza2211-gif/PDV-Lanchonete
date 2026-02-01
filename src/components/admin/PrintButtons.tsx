@@ -7,6 +7,7 @@ import { Pedido } from '../../services/api/pedidos.service'
 import { usePrinter } from '../../hooks/usePrinter'
 
 interface PrintButtonsProps {
+// elginPrinter removido: impressão agora usa os novos templates/funções
   pedido: Pedido
   showMotoboy?: boolean // Mostrar botão de motoboy apenas se for entrega
   onPrintSuccess?: (type: string) => void
@@ -20,11 +21,22 @@ export default function PrintButtons({
   const { printProducao, printMotoboy, status } = usePrinter()
   const [showMenu, setShowMenu] = React.useState(false)
 
-  const isEntrega = pedido.tipoentrega === 'entrega'
+  const isEntrega = pedido.tipoentrega === 'entrega' // elginPrinter removido: impressão agora usa os novos templates/funções
   const isLoading = status.isLoading
 
+  // Busca itens do pedido se não estiverem presentes
+  const fetchPedidoComItens = async () => {
+    if (!pedido.itens || pedido.itens.length === 0) {
+      const { pedidoItensService } = await import('../../services/api/pedido_itens.service')
+      const itens = await pedidoItensService.buscarPorPedido(pedido.id)
+      return { ...pedido, itens }
+    }
+    return pedido
+  }
+
   const handlePrintProducao = async () => {
-    const success = await printProducao(pedido)
+    const pedidoCompleto = await fetchPedidoComItens()
+    const success = await printProducao(pedidoCompleto)
     if (success) {
       onPrintSuccess?.('producao')
       setShowMenu(false)
@@ -32,7 +44,8 @@ export default function PrintButtons({
   }
 
   const handlePrintMotoboy = async () => {
-    const success = await printMotoboy(pedido)
+    const pedidoCompleto = await fetchPedidoComItens()
+    const success = await printMotoboy(pedidoCompleto)
     if (success) {
       onPrintSuccess?.('motoboy')
       setShowMenu(false)

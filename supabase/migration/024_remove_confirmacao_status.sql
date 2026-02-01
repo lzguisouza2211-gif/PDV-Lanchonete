@@ -1,3 +1,6 @@
+-- Migration 024
+-- Remove status de confirmação de pedidos.
+-- Data: 2026-01-28
 -- Remove status "confirmação" remapping to "Em preparo" and drop old trigger
 
 -- Atualiza registros existentes

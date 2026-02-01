@@ -1,10 +1,21 @@
+// Componente utilitário para exibir um label e valor
+function InfoItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ background: '#f9fafb', padding: 12, borderRadius: 8 }}>
+      <div style={{ fontSize: 12, color: '#666', marginBottom: 4, fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>{value}</div>
+    </div>
+  );
+}
 import { useEffect, useState } from 'react'
+import { pedidoItensService } from '../../services/api/pedido_itens.service'
+import { supabase } from '../../services/supabaseClient'
 import { Pedido } from '../../services/api/pedidos.service'
 import usePedidos from '../../hooks/usePedidos'
-import { supabase } from '../../services/supabaseClient'
+import { pedidosService } from '../../services/api/pedidos.service'
 import PrintButtons from '../../components/admin/PrintButtons'
-import { printQueue } from '../../services/printer/printQueue'
-import { elginPrinter } from '../../services/printer/elginPrinter'
+// printQueue removido: utilize os novos templates de impressão
+// elginPrinter removido: utilize os novos templates/funções de impressão
 
 const COLUMNS = [
   { id: 'Recebido', title: 'Recebido', color: '#fff3cd', icon: '📥' },
@@ -13,11 +24,26 @@ const COLUMNS = [
 ]
 
 export default function Admin() {
-  const { listPedidos, atualizarStatus, loading, error } = usePedidos()
+  const { atualizarStatus } = usePedidos()
 
   const [pedidos, setPedidos] = useState<Pedido[]>([])
-  const [pedidoSelecionado, setPedidoSelecionado] =
-    useState<Pedido | null>(null)
+  const [pedidoSelecionado, setPedidoSelecionado] = useState<Pedido | null>(null)
+
+  // Carregar itens do pedido ao abrir modal SEMPRE que abrir (garante atualização)
+  useEffect(() => {
+    if (!pedidoSelecionado) return;
+    let cancelado = false;
+    const fetchItens = async () => {
+      const itens = await pedidoItensService.buscarPorPedido(pedidoSelecionado.id)
+      if (!cancelado) {
+        setPedidoSelecionado(prev => prev ? { ...prev, itens } : prev)
+      }
+    }
+    fetchItens();
+    return () => { cancelado = true; };
+  }, [pedidoSelecionado])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const formatEndereco = (pedido?: Pedido | null) => {
     if (!pedido) return ''
@@ -38,11 +64,20 @@ export default function Admin() {
   ======================= */
   useEffect(() => {
     const load = async () => {
-      const data = await listPedidos()
-      setPedidos([...data].sort((a, b) => b.id - a.id))
+      setLoading(true)
+      setError(null)
+      try {
+        const data = await pedidosService.list()
+        setPedidos([...data].sort((a, b) => b.id - a.id))
+      } catch (e: any) {
+        setError(e?.message || 'Erro ao carregar pedidos')
+      } finally {
+        setLoading(false)
+      }
     }
     load()
-  }, [listPedidos])
+    return undefined;
+  }, [])
 
   /* =======================
      REALTIME
@@ -50,112 +85,56 @@ export default function Admin() {
   useEffect(() => {
     const channel = supabase
       .channel('admin-pedidos-realtime')
-
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'pedidos' },
-        (payload) => {
+        async (payload) => {
           console.log('🔔 REALTIME: Novo pedido detectado!', payload)
           const novo = payload.new as Pedido
-
+          // Buscar itens do novo pedido
+          const { data: itens, error: errorItens } = await supabase
+            .from('pedido_itens')
+            .select('*')
+            .eq('pedido_id', novo.id)
+            .order('id', { ascending: true })
           setPedidos((prev) => {
             if (prev.some((p) => p.id === novo.id)) return prev
-            return [novo, ...prev]
+            return [{ ...novo, itens: !errorItens && itens ? itens : [] }, ...prev]
           })
-
           // 🖨️ IMPRESSÃO AUTOMÁTICA
           console.log('🖨️ Novo pedido recebido! Iniciando impressão automática...', novo.id)
-          
-          // Imprimir notinha de produção
-          try {
-            const contentProducao = elginPrinter.generateProducao(novo)
-            printQueue.addJob('producao', {
-              pedidoId: novo.id,
-              content: contentProducao,
-            })
-            console.log(`✅ Notinha de produção do pedido #${novo.id} adicionada à fila`)
-          } catch (error) {
-            console.error('❌ Erro ao adicionar notinha de produção:', error)
-          }
-
-          // Imprimir notinha de motoboy (se for entrega)
-          if (novo.tipoentrega === 'entrega') {
-            try {
-              const contentMotoboy = elginPrinter.generateMotoboy(novo)
-              printQueue.addJob('motoboy', {
-                pedidoId: novo.id,
-                content: contentMotoboy,
-              })
-              console.log(`✅ Notinha de motoboy do pedido #${novo.id} adicionada à fila`)
-            } catch (error) {
-              console.error('❌ Erro ao adicionar notinha de motoboy:', error)
-            }
-          }
+          // Imprimir notinha de produção e motoboy agora é feito via usePrinter/PrintButtons e API backend
         }
       )
-
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'pedidos' },
-        (payload) => {
+        async (payload) => {
           const atualizado = payload.new as Pedido
-
+          // Buscar itens atualizados do pedido
+          const { data: itens, error: errorItens } = await supabase
+            .from('pedido_itens')
+            .select('*')
+            .eq('pedido_id', atualizado.id)
+            .order('id', { ascending: true })
           setPedidos((prev) =>
             prev.map((p) =>
-              p.id === atualizado.id ? atualizado : p
+              p.id === atualizado.id ? { ...atualizado, itens: !errorItens && itens ? itens : [] } : p
             )
           )
         }
       )
-
-      .subscribe()
-
+      .subscribe();
+    // useEffect de inicialização de impressora removido: impressão agora é feita via API/backend
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, []);
 
-  /* =======================
-     INICIALIZAR IMPRESSORA
-  ======================= */
-  useEffect(() => {
-    // Registra callback para a fila de impressão
-    printQueue.registerPrintCallback(async (job) => {
-      let printReady = false
-      try {
-        printQueue.setPrinterReady(false)
-        printReady = true
-
-        // Extrai o conteúdo do job
-        const content = job.data.content || ''
-
-        // Tenta imprimir (API ou fallback para navegador)
-        const printed = await elginPrinter.print(content)
-
-        // Mesmo que use fallback, consideramos como sucesso
-        if (!printed) {
-          console.warn('⚠️  Impressão via fallback do navegador')
-        } else {
-          console.log('✅ Impressão bem-sucedida')
-        }
-      } catch (error) {
-        console.error('❌ Erro crítico durante impressão:', error)
-      } finally {
-        // SEMPRE retorna a impressora como pronta
-        if (printReady) {
-          printQueue.setPrinterReady(true)
-        }
-      }
-    })
-  }, [])
-
-  /* =======================
-     AVANÇAR STATUS
-  ======================= */
+  // Função para avançar status do pedido
   const avancarStatus = async (pedido: Pedido) => {
-    const statusAtual = pedido.status ?? 'Recebido'
-    
     let proximoStatus: string
+    const statusAtual = pedido.status ?? 'Recebido'
     if (statusAtual === 'Recebido') {
       proximoStatus = 'Em preparo'
     } else if (statusAtual === 'Em preparo') {
@@ -215,7 +194,6 @@ export default function Admin() {
       <h1 style={{ marginBottom: 32, fontSize: 32, fontWeight: 700 }}>
         📋 Painel de Pedidos
       </h1>
-
       <div
         style={{
           display: 'grid',
@@ -227,17 +205,13 @@ export default function Admin() {
         {COLUMNS.map((col) => {
           let pedidosColuna = pedidos.filter(
             (p) => (p.status ?? 'Recebido') === col.id
-          )
-
+          );
           // 🔒 Finalizados: só hoje + limite visual
           if (col.id === 'Finalizado') {
             pedidosColuna = pedidosColuna
-              .filter((p: any) =>
-                p.created_at?.startsWith(hoje)
-              )
-              .slice(0, 20)
+              .filter((p: any) => p.created_at?.startsWith(hoje))
+              .slice(0, 20);
           }
-
           return (
             <div
               key={col.id}
@@ -285,187 +259,103 @@ export default function Admin() {
                   {pedidosColuna.length}
                 </span>
               </div>
-
-              {pedidosColuna.length === 0 ? (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '40px 20px',
-                    color: '#999',
-                    fontSize: 14,
-                  }}
-                >
-                  Nenhum pedido
-                </div>
-              ) : (
-                pedidosColuna.map((pedido) => {
-                  const bloqueado = pedido.status === 'Finalizado'
-                  const hora = (pedido as any).created_at
-                    ? new Date(
-                        (pedido as any).created_at
-                      ).toLocaleTimeString('pt-BR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    : '--:--'
-
-                  return (
-                    <div
-                      key={pedido.id}
-                      style={{
-                        background: '#f9fafb',
-                        borderRadius: 12,
-                        padding: 16,
-                        marginBottom: 12,
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-                        opacity: bloqueado ? 0.7 : 1,
-                        border: '1px solid #e5e7eb',
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      <div
-                        onClick={() => setPedidoSelecionado(pedido)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            fontSize: 16,
-                            marginBottom: 8,
-                            color: '#1a1a1a',
-                          }}
-                        >
-                          {pedido.cliente}
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: 13,
-                            color: '#666',
-                            marginBottom: 8,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 4,
-                          }}
-                        >
-                          <div>
-                            📦 {pedido.tipoentrega ?? 'retirada'}
-                          </div>
-                          <div>
-                            💳 {pedido.formapagamento ?? '-'}
-                          </div>
-                          {pedido.troco && (
-                            <div style={{ fontSize: 12, color: '#27ae60' }}>
-                              💵 Troco: R$ {Number(pedido.troco).toFixed(2)}
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Itens com extras/observações */}
-                        {pedido.itens && pedido.itens.length > 0 && (
-                          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
-                            {pedido.itens.some((item: any) => 
-                              (item.extras && item.extras.length > 0) || item.observacoes
-                            ) && (
-                              <div style={{ marginTop: 4 }}>
-                                ✨ Personalizado
-                              </div>
-                            )}
+              {pedidosColuna.map((pedido) => {
+                const bloqueado = pedido.status === 'Finalizado';
+                const hora = (pedido as any).created_at
+                  ? new Date((pedido as any).created_at).toLocaleTimeString('pt-BR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : '--:--';
+                return (
+                  <div
+                    key={pedido.id}
+                    style={{
+                      background: '#f9fafb',
+                      borderRadius: 12,
+                      padding: 16,
+                      marginBottom: 12,
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                      opacity: bloqueado ? 0.7 : 1,
+                      border: '1px solid #e5e7eb',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <div onClick={() => setPedidoSelecionado(pedido)} style={{ cursor: 'pointer' }}>
+                      <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 8, color: '#1a1a1a' }}>{pedido.cliente}</div>
+                      <div style={{ fontSize: 13, color: '#666', marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div>📦 {pedido.tipoentrega ?? 'retirada'}</div>
+                        <div>💳 {pedido.formapagamento ?? '-'}</div>
+                        {pedido.troco && (
+                          <div style={{ fontSize: 12, color: '#27ae60' }}>
+                            💵 Troco: R$ {Number(pedido.troco).toFixed(2)}
                           </div>
                         )}
-
-                        <div
-                          style={{
-                            marginTop: 12,
-                            paddingTop: 12,
-                            borderTop: '1px solid #e5e7eb',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <div>
-                            <strong
-                              style={{
-                                fontSize: 18,
-                                color: '#c0392b',
-                                fontWeight: 700,
-                              }}
-                            >
-                              R$ {pedido.total.toFixed(2)}
-                            </strong>
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: '#999',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'flex-end',
-                            }}
-                          >
-                            <span>🕒 {hora}</span>
-                            <span>#{pedido.id}</span>
-                          </div>
-                        </div>
                       </div>
-
-                      {/* Botão para avançar status */}
-                      {!bloqueado && (
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              avancarStatus(pedido)
-                            }}
-                            style={{
-                              flex: 1,
-                              marginTop: 12,
-                              padding: '10px 16px',
-                              background: col.id === 'Recebido' ? '#3498db' : '#27ae60',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: 8,
-                              fontSize: 14,
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'translateY(-2px)'
-                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'translateY(0)'
-                              e.currentTarget.style.boxShadow = 'none'
-                            }}
-                          >
-                            {col.id === 'Recebido' ? '👨‍🍳 Iniciar preparo' : '✅ Finalizar'}
-                          </button>
+                      {pedido.itens && pedido.itens.length > 0 && (
+                        <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+                          {pedido.itens.some((item: any) => (item.extras && item.extras.length > 0) || item.observacoes) && (
+                            <div style={{ marginTop: 4 }}>✨ Personalizado</div>
+                          )}
                         </div>
                       )}
-
-                      {/* Botão de impressão */}
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ marginTop: 8 }}
-                      >
-                        <PrintButtons
-                          pedido={pedido}
-                          showMotoboy={true}
-                          onPrintSuccess={() => {
-                            console.log(
-                              `✅ Impressão do pedido #${pedido.id} enviada`
-                            )
-                          }}
-                        />
+                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong style={{ fontSize: 18, color: '#c0392b', fontWeight: 700 }}>R$ {pedido.total.toFixed(2)}</strong>
+                        </div>
+                        <div style={{ fontSize: 11, color: '#999', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                          <span>🕒 {hora}</span>
+                          <span>#{pedido.id}</span>
+                        </div>
                       </div>
                     </div>
-                  )
-                })
-              )}
+                    {!bloqueado && (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            avancarStatus(pedido);
+                          }}
+                          style={{
+                            flex: 1,
+                            marginTop: 12,
+                            padding: '10px 16px',
+                            background: col.id === 'Recebido' ? '#3498db' : '#27ae60',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 8,
+                            fontSize: 14,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          {col.id === 'Recebido' ? '👨‍🍳 Iniciar preparo' : '✅ Finalizar'}
+                        </button>
+                      </div>
+                    )}
+                    <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 8 }}>
+                      <PrintButtons
+                        pedido={pedido}
+                        showMotoboy={true}
+                        onPrintSuccess={() => {
+                          console.log(`✅ Impressão do pedido #${pedido.id} enviada`);
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )
+          );
         })}
       </div>
 
@@ -558,13 +448,14 @@ export default function Admin() {
               <div style={{ background: '#f9fafb', borderRadius: 12, padding: 16 }}>
                 {pedidoSelecionado.itens.map((item: any, idx) => {
                   const precoBase = item.preco
-                  const precoExtras = (item.extras || []).reduce((sum: number, extra: any) => {
-                    return sum + (extra.tipo === 'add' ? extra.preco : 0)
-                  }, 0)
-                  const precoUnitario = precoBase + precoExtras
+                  // Adicionais e retirados agora vêm em campos separados
+                  const adicionais = item.adicionais || []
+                  const retirados = item.retirados || []
+                  const precoAdicionais = adicionais.reduce((sum: number, add: any) => sum + (add.preco || 0), 0)
+                  const precoUnitario = precoBase + precoAdicionais
                   const quantidade = item.quantidade || 1
                   const precoTotal = precoUnitario * quantidade
-                  
+
                   return (
                     <div
                       key={idx}
@@ -599,43 +490,47 @@ export default function Admin() {
                           R$ {precoBase.toFixed(2)}
                         </span>
                       </div>
-                      
-                      {/* Extras */}
-                      {item.extras && item.extras.length > 0 && (
+
+                      {/* Adicionais */}
+                      {adicionais.length > 0 && (
                         <div style={{ marginTop: 6, marginBottom: 4 }}>
-                          {item.extras
-                            .filter((e: any) => e.tipo === 'add')
-                            .map((extra: any, eIdx: number) => (
-                              <div
-                                key={eIdx}
-                                style={{
-                                  fontSize: 13,
-                                  color: '#27ae60',
-                                  marginBottom: 2,
-                                  paddingLeft: 8,
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                }}
-                              >
-                                <span>+ {extra.nome}</span>
-                                <span style={{ fontWeight: 600 }}>R$ {extra.preco.toFixed(2)}</span>
-                              </div>
-                            ))}
-                          {item.extras
-                            .filter((e: any) => e.tipo === 'remove')
-                            .map((extra: any, eIdx: number) => (
-                              <div
-                                key={eIdx}
-                                style={{
-                                  fontSize: 13,
-                                  color: '#e74c3c',
-                                  marginBottom: 2,
-                                  paddingLeft: 8,
-                                }}
-                              >
-                                - Sem {extra.nome}
-                              </div>
-                            ))}
+                          {adicionais.map((add: any, aIdx: number) => (
+                            <div
+                              key={aIdx}
+                              style={{
+                                fontSize: 13,
+                                color: '#27ae60',
+                                marginBottom: 2,
+                                paddingLeft: 8,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                              }}
+                            >
+                              <span>+ {add.nome}</span>
+                              {add.preco !== undefined && (
+                                <span style={{ fontWeight: 600 }}>R$ {Number(add.preco).toFixed(2)}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Retirados */}
+                      {retirados.length > 0 && (
+                        <div style={{ marginTop: 6, marginBottom: 4 }}>
+                          {retirados.map((ret: any, rIdx: number) => (
+                            <div
+                              key={rIdx}
+                              style={{
+                                fontSize: 13,
+                                color: '#e74c3c',
+                                marginBottom: 2,
+                                paddingLeft: 8,
+                              }}
+                            >
+                              - Sem {ret.nome || ret}
+                            </div>
+                          ))}
                         </div>
                       )}
                       
@@ -828,34 +723,5 @@ export default function Admin() {
   )
 }
 
-function InfoItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div
-      style={{
-        background: '#f9fafb',
-        padding: 12,
-        borderRadius: 8,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 12,
-          color: '#666',
-          marginBottom: 4,
-          fontWeight: 500,
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontSize: 14,
-          fontWeight: 600,
-          color: '#1a1a1a',
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  )
-}
+
+

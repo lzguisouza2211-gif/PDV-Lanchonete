@@ -1,3 +1,6 @@
+-- Migration 011
+-- Popula a tabela de adicionais de produtos (product_addons).
+-- Data: 2026-01-28
 -- ============================================
 -- POPULAR TABELA DE ADICIONAIS (IDEMPOTENTE)
 -- ============================================

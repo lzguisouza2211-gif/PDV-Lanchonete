@@ -1,3 +1,6 @@
+-- Migration 008
+-- Criação da tabela para status da loja (aberta/fechada).
+-- Data: 2026-01-28
 create table if not exists store_status (
   id smallint primary key default 1,
   is_open boolean not null default true,

@@ -1,3 +1,6 @@
+-- Migration 025
+-- Adiciona campo de telefone na tabela de pedidos.
+-- Data: 2026-01-28
 -- Adiciona coluna telefone obrigatória na tabela pedidos
 alter table public.pedidos
 add column if not exists telefone text;

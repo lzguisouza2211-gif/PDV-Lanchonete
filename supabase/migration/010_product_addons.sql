@@ -1,3 +1,6 @@
+-- Migration 010
+-- Criação da tabela de adicionais de produtos (product_addons).
+-- Data: 2026-01-28
 -- ============================================
 -- TABELA DE ADICIONAIS POR PRODUTO
 -- ============================================

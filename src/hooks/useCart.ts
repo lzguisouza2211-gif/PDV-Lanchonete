@@ -45,10 +45,10 @@ export function useCartWithPedidos() {
   const cart = useCart()
   const { criarPedido: criarPedidoService } = usePedidos()
 
+
   async function criarPedido(input: {
     cliente: string
     tipoentrega?: string
-    endereco?: string
     endereco?: string
     numero?: string
     bairro?: string
@@ -58,7 +58,6 @@ export function useCartWithPedidos() {
     if (!input.cliente) {
       throw new Error('Cliente é obrigatório')
     }
-
     if (cart.items.length === 0) return null
 
     const endereco =
@@ -66,38 +65,40 @@ export function useCartWithPedidos() {
         ? `${input.endereco || ''}${input.numero ? `, ${input.numero}` : ''}${input.bairro ? ` - ${input.bairro}` : ''}`
         : null
 
+    // Monta o array de itens para o campo jsonb
+    const itensPayload = cart.items.map((item) => ({
+      nome: item.name,
+      preco: item.price,
+      quantidade: item.qty,
+      adicionais: (item.extras || []).filter(e => e.tipo === 'add'),
+      retirados: (item.extras || []).filter(e => e.tipo === 'remove'),
+      observacoes: item.observacoes,
+    }))
+
+    // Cria pedido já com o campo itens
     const pedido = {
       cliente: input.cliente,
-      tipoEntrega: input.tipoentrega ?? null,
-      endereco,
+      tipoentrega: input.tipoentrega ?? null,
       endereco: input.tipoentrega === 'entrega' ? input.endereco ?? null : null,
       numero: input.tipoentrega === 'entrega' ? input.numero ?? null : null,
       bairro: input.tipoentrega === 'entrega' ? input.bairro ?? null : null,
-      formaPagamento: input.formapagamento ?? null,
+      formapagamento: input.formapagamento ?? null,
       troco: input.troco ?? null,
       status: 'Recebido',
-      total: cart.items.reduce(
-        (s, i) => s + i.price * i.qty,
-        0
-      ),
-      itens: cart.items.map((item) => ({
-        nome: item.name,
-        preco: item.price,
-        quantidade: item.qty,
-        categoria: item.categoria,
-        observacoes: item.observacoes,
-        ingredientes_indisponiveis: item.ingredientes_indisponiveis,
-        extras: item.extras,
-      })),
+      total: cart.items.reduce((s, i) => s + i.price * i.qty, 0),
+      itens: itensPayload,
     }
 
-    const criado = await criarPedidoService(pedido)
-
-    if (criado) {
-      cart.clear()
+    // Usa o fluxo correto do hook para garantir trigger
+    const { criarPedido: criarPedidoService } = usePedidos()
+    const ok = await criarPedidoService(pedido)
+    if (!ok) {
+      console.error('Erro ao criar pedido')
+      return false
     }
 
-    return criado
+    cart.clear()
+    return true
   }
 
   return {

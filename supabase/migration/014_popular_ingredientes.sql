@@ -1,3 +1,6 @@
+-- Migration 014
+-- Popula a tabela de ingredientes do cardápio.
+-- Data: 2026-01-28
 -- ============================================
 -- POPULAR COLUNA INGREDIENTES DO CARDÁPIO
 -- ============================================

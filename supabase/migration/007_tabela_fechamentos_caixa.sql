@@ -35,9 +35,10 @@ with check (
     from admins
     where admins.user_id = auth.uid()
       and admins.ativo = true
+  -- Migration 007
+  -- Criação da tabela de fechamentos de caixa para controle financeiro.
+  -- Data: 2026-01-28
   )
-);
-
 -- Apenas admins podem ver fechamentos
 create policy "admin_can_select_fechamentos"
 on fechamentos_caixa

@@ -1,3 +1,6 @@
+-- Migration 022
+-- Criação de templates de mensagens para WhatsApp.
+-- Data: 2026-01-28
 -- ============================================
 -- Migration 022: Templates de WhatsApp na fila
 -- ============================================

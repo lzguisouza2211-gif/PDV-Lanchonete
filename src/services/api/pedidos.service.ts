@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient'
+import { pedidoItensService, PedidoItem } from './pedido_itens.service'
 
 export type Adicional = {
   nome: string
@@ -13,11 +14,10 @@ export type Item = {
 export type Pedido = {
   id: number
   cliente: string
-  itens: Item[]
+  itens: PedidoItem[]
   total: number
   status?: string
   tipoentrega?: string
-  endereco?: string
   endereco?: string
   numero?: string
   bairro?: string
@@ -39,7 +39,14 @@ export const pedidosService = {
       throw error
     }
 
-    return data || []
+    // Buscar itens para cada pedido (garante sempre preenchido)
+    const pedidos: Pedido[] = data || []
+    return await Promise.all(
+      pedidos.map(async (pedido) => {
+        const itens = await pedidoItensService.buscarPorPedido(pedido.id)
+        return { ...pedido, itens }
+      })
+    )
   },
 
   async listByRange(start: string, end: string): Promise<Pedido[]> {
@@ -53,7 +60,11 @@ export const pedidosService = {
       throw error
     }
 
-    return data || []
+    const pedidos: Pedido[] = data || []
+    for (const pedido of pedidos) {
+      pedido.itens = await pedidoItensService.buscarPorPedido(pedido.id)
+    }
+    return pedidos
   },
 
   async create(pedido: Omit<Pedido, 'id'>): Promise<boolean> {

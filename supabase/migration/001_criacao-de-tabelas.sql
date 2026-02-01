@@ -7,6 +7,9 @@ create table if not exists cardapio (
   ativo boolean default true,
   criado_at timestamptz default now()
 );
+-- Migration 001
+-- Criação das tabelas principais do sistema: cardapio e pedidos, com índices e políticas iniciais de segurança.
+-- Data: 2026-01-28
 
 create table if not exists pedidos (
   id bigint generated always as identity primary key,

@@ -20,9 +20,10 @@ drop policy if exists "anon_can_insert_pedidos" on pedidos;
 drop policy if exists "anon_can_view_own_pedidos" on pedidos;
 drop policy if exists "authenticated_can_view_own_pedidos" on pedidos;
 drop policy if exists "admin_can_delete_pedidos" on pedidos;
+-- Migration 005
+-- Criação e ajustes de políticas RLS para segurança dos dados de pedidos.
+-- Data: 2026-01-28
 
--- ============================================
--- POLICIES PARA ANON (usuários não autenticados)
 -- ============================================
 
 -- Anon pode inserir pedidos (sem user_id obrigatório)
