@@ -34,7 +34,11 @@ using (
 
 ) with check (
 
-  (EXISTS 
+  (EXISTS (
+    SELECT 1
+    FROM admins
+    WHERE ((admins.user_id = auth.uid()) AND (admins.ativo = true))
+  ))
 
 );
 
@@ -153,10 +157,3 @@ with check (
   true
 
 );
-
-
-create policy "authenticated_can_insert_whatsapp_notifications"
-on public.whatsapp_notifications
-for insert
-to authenticated
-with check (true);
