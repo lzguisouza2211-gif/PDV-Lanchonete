@@ -8,7 +8,8 @@
     "build": "npx vite build",
     "preview": "npx vite preview",
     "printer:server": "node printer-backend.js",
-    "printer:cups": "node printer-backend-cups.js"
+    "printer:cups": "node printer-backend-cups.js",
+    "whatsapp:worker": "node scripts/whatsapp-worker.js"
   },
   "keywords": [],
   "author": "",
@@ -24,8 +25,11 @@
     "@hello-pangea/dnd": "^18.0.1",
     "@supabase/supabase-js": "^2.90.0",
     "@types/react-input-mask": "^3.0.6",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
     "escpos": "^3.0.0-alpha.6",
     "express": "^5.2.1",
+    "node-cron": "^3.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-input-mask": "^2.0.4",

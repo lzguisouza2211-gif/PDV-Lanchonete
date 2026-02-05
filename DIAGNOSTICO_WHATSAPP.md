@@ -16,13 +16,12 @@ O telefone estava sendo salvo sem o código do país (55), causando falha no env
 
 ---
 
-## 📋 Checklist de Verificação no n8n
+## 📋 Checklist de Verificação no Worker
 
-### 1. Verificar Configuração do Webhook
+### 1. Verificar execução do worker
 ```
-✓ Webhook está ativo?
-✓ URL do webhook está correta?
-✓ Método está como POST?
+✓ Worker está rodando?
+✓ Logs aparecem a cada ciclo?
 ```
 
 ### 2. Verificar Credenciais WhatsApp
@@ -34,9 +33,9 @@ O telefone estava sendo salvo sem o código do país (55), causando falha no env
 ```
 
 ### 3. Verificar Formato da Mensagem
-No fluxo do n8n, verifique se está usando:
+No payload enviado, verifique se está usando:
 ```javascript
-// Node de envio do WhatsApp deve usar:
+// Envio do WhatsApp deve usar:
 {
   "to": "{{ $json.telefone }}",  // Deve estar como 5535XXXXXXXXX
   "type": "text",
@@ -95,28 +94,21 @@ LIMIT 1;
 
 ---
 
-## 🔧 Configuração do n8n
+## 🔧 Configuração do Worker
 
 ### Fluxo Recomendado
 
 ```
-1. [Webhook] - Recebe POST do Supabase
-   ↓
-2. [Set] - Prepara dados
-   - telefone: {{ $json.telefone }}
-   - mensagem: {{ $json.mensagem }}
-   ↓
-3. [WhatsApp Node] - Envia mensagem
-   - To: {{ $json.telefone }}
-   - Message: {{ $json.mensagem }}
-   ↓
-4. [Supabase] - Atualiza status
-   - UPDATE whatsapp_notifications
-   - SET status = 'sent'
-   - WHERE id = {{ $json.id }}
+1. [Supabase] - Tabela `whatsapp_notifications`
+  ↓
+2. [Worker] - Busca status `pending`
+  ↓
+3. [API WhatsApp] - Envia mensagem
+  ↓
+4. [Supabase] - Atualiza status para `sent`/`error`
 ```
 
-### Configuração do WhatsApp Node
+### Configuração da API WhatsApp
 
 **Credenciais necessárias:**
 - Access Token (do Facebook Business)
@@ -168,14 +160,14 @@ Content-Type: application/json
 **Solução:**
 1. Acesse Facebook Business Manager
 2. Gere um novo token de acesso
-3. Atualize no n8n
+3. Atualize o worker
 
 ---
 
 ## 📞 Suporte
 
 Se o erro persistir:
-1. Verifique logs do n8n
+1. Verifique logs do worker
 2. Teste envio manual via Postman/Insomnia
 3. Valide credenciais no Facebook Business Manager
 4. Confirme que o número do restaurante (5535998943978) está verificado

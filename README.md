@@ -65,7 +65,7 @@ Execute as migrations na ordem no Supabase SQL Editor:
 3. `003_tabela_admins.sql`
 4. `004_timestamps_pedidos.sql`
 5. `005_policies_rls.sql`
-6. `006_whatsapp_n8n_trigger.sql`
+6. `006_whatsapp_webhook_trigger.sql`
 7. `007_tabela_fechamentos_caixa.sql`
 
 ## 🚀 Deploy no Vercel
