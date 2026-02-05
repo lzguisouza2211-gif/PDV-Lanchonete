@@ -6,7 +6,7 @@ Quando o admin muda o status de um pedido (Ex: Recebido → Preparando → Pront
 
 ### Fluxo:
 ```
-Pedido criado → Admin muda status → Banco cria notificação na fila → n8n lê fila → Envia WhatsApp → Marca como enviado
+Pedido criado → Admin muda status → Banco cria notificação na fila → Worker Node.js lê fila → Envia WhatsApp → Marca como enviado
 ```
 
 ---
@@ -62,158 +62,25 @@ Pedido criado → Admin muda status → Banco cria notificação na fila → n8n
 
 ---
 
-## 📱 PARTE 2: Configurar o n8n (Automação WhatsApp)
+## 📱 PARTE 2: Configurar o Worker Node.js
 
-### Passo 5: Abrir o n8n
+### Passo 5: Preparar variáveis de ambiente
 
-1. Acesse seu n8n: `http://localhost:5678` (ou o domínio cloud se tiver)
-2. Clique em **Workflows** no menu lateral
-3. Clique em **+ Add workflow** (criar novo)
-4. Dê um nome: "WhatsApp - Envio de Notificações de Pedidos"
+1. Crie um arquivo `.env` na raiz (se ainda não existir)
+2. Configure as variáveis do worker conforme [WHATSAPP_WORKER.md](WHATSAPP_WORKER.md)
 
 ---
 
-### Passo 6: Adicionar Trigger (Schedule)
+### Passo 6: Instalar dependências
 
-1. Clique no **+** para adicionar o primeiro nó
-2. Busque por "**Schedule Trigger**" e selecione
-3. Configure:
-   - **Mode:** Interval
-   - **Interval:** 30 (segundos)
-4. Clique em **Add & Execute node**
-
-**O que isso faz:** Executa o workflow a cada 30 segundos para buscar notificações pendentes.
+1. Rode `npm install`
 
 ---
 
-### Passo 7: Adicionar Supabase (Buscar notificações pendentes)
+### Passo 7: Iniciar o worker
 
-1. Clique no **+** embaixo do Schedule Trigger
-2. Busque por "**Postgres**" ou "**Supabase**" e selecione
-3. Configure a **Credential** (primeira vez):
-   - Clique em "Create New Credential"
-   - Host: pegue do Supabase (Settings → Database → Host)
-   - Database: `postgres`
-   - User: `postgres`
-   - Password: sua senha do Supabase (Settings → Database → Database password)
-   - Port: `5432`
-   - SSL: `allow` ou `require`
-   - Clique em **Save**
-4. Configure a Query:
-   - **Operation:** Execute Query
-   - **Query:**
-     ```sql
-     SELECT * FROM whatsapp_notifications
-     WHERE status = 'pending'
-     ORDER BY created_at
-     LIMIT 10;
-     ```
-5. Clique em **Execute node** para testar
-6. ✅ Se não houver notificações, retorna vazio (ok!)
-
----
-
-### Passo 8: Adicionar IF (Verificar se há notificações)
-
-1. Clique no **+** embaixo do nó Postgres
-2. Busque por "**IF**" e selecione
-3. Configure:
-   - **Conditions:**
-     - **Condition:** Data Exists
-   - **Mode:** Continue on true, stop on false
-4. Clique em **Execute node**
-
-**O que isso faz:** Se não houver notificações pendentes, o workflow para aqui (não envia nada).
-
----
-
-### Passo 9: Adicionar Loop Over Items (Processar cada notificação)
-
-1. Do lado "**true**" do IF, clique no **+**
-2. Busque por "**Loop Over Items**" e selecione
-3. Deixe as configurações padrão
-4. Clique em **Execute node**
-
-**O que isso faz:** Percorre cada notificação pendente, uma por vez.
-
----
-
-### Passo 10: Adicionar HTTP Request (Enviar WhatsApp)
-
-⚠️ **Importante:** Você precisa de um provedor de WhatsApp API. Escolha um:
-- **Evolution API** (gratuito, self-hosted): https://evolution-api.com
-- **Z-API** (pago): https://z-api.io
-- **Twilio** (pago): https://twilio.com/whatsapp
-- **Meta Cloud API** (grátis até 1000 msg/mês): https://developers.facebook.com/docs/whatsapp
-
-Vou mostrar exemplo genérico (você adapta conforme seu provedor):
-
-1. Do lado "**Loop Item**" do Loop Over Items, clique no **+**
-2. Busque por "**HTTP Request**" e selecione
-3. Configure (exemplo Evolution API):
-   - **Method:** POST
-   - **URL:** `https://sua-evolution-api.com/message/sendText/sua-instancia`
-   - **Authentication:** Bearer Token (se necessário)
-   - **Send Body:** On
-   - **Body Content Type:** JSON
-   - **Specify Body:** Using JSON
-   - **JSON Body:**
-     ```json
-     {
-       "number": "{{ $json.telefone }}",
-       "text": "Olá {{ $json.cliente }}!\n\n{{ $json.mensagem }}\n\nPedido #{{ $json.pedido_id }}\nTotal: R$ {{ $json.payload.total }}\n\nAcompanhe seu pedido em: https://seu-site.com"
-     }
-     ```
-4. Clique em **Execute node** (vai dar erro por enquanto, ok!)
-
-**Adapte conforme seu provedor:**
-- Evolution API: endpoint `sendText`, body `{number, text}`
-- Z-API: endpoint `send-text`, body `{phone, message}`
-- Twilio: endpoint e formato diferente
-- Meta Cloud API: usa templates, formato mais complexo
-
----
-
-### Passo 11: Adicionar Supabase (Marcar como enviado)
-
-1. Do lado "**Output 1**" do HTTP Request, clique no **+**
-2. Busque por "**Postgres**" ou "**Supabase**" e selecione
-3. Use a mesma credential do Passo 7
-4. Configure:
-   - **Operation:** Execute Query
-   - **Query:**
-     ```sql
-     UPDATE whatsapp_notifications
-     SET status = 'sent', processed_at = NOW()
-     WHERE id = {{ $json.id }};
-     ```
-5. Clique em **Execute node**
-
----
-
-### Passo 12: Adicionar tratamento de erro
-
-1. No nó **HTTP Request**, clique nos 3 pontinhos (...) no canto superior direito
-2. Clique em "**Add Error Workflow**"
-3. Adicione um nó **Postgres** conectado ao erro
-4. Configure:
-   - **Operation:** Execute Query
-   - **Query:**
-     ```sql
-     UPDATE whatsapp_notifications
-     SET status = 'error', 
-         error_message = '{{ $json.error.message }}',
-         processed_at = NOW()
-     WHERE id = {{ $json.id }};
-     ```
-
----
-
-### Passo 13: Ativar o workflow
-
-1. No canto superior direito, clique na chave (**Inactive**)
-2. Mude para **Active**
-3. ✅ O workflow agora roda automaticamente a cada 30 segundos!
+1. Rode `npm run whatsapp:worker`
+2. ✅ O worker busca notificações pendentes e envia automaticamente
 
 ---
 
@@ -258,19 +125,10 @@ Vou mostrar exemplo genérico (você adapta conforme seu provedor):
 
 ---
 
-### Passo 17: Verificar envio no n8n
+### Passo 17: Verificar envio no worker
 
-1. Volte ao n8n
-2. Clique em **Executions** no menu lateral
-3. ✅ Você deve ver execuções acontecendo a cada 30s
-4. Clique na última execução
-5. Verifique:
-   - Schedule → ✅ verde
-   - Postgres (fetch) → ✅ verde (com 1 item)
-   - IF → ✅ true
-   - Loop Over Items → ✅ verde
-   - HTTP Request → ✅ verde (status 200)
-   - Postgres (update) → ✅ verde
+1. Verifique o terminal onde o worker está rodando
+2. ✅ Você deve ver logs com envio e atualização de status
 
 ---
 
@@ -306,13 +164,13 @@ Vou mostrar exemplo genérico (você adapta conforme seu provedor):
 - [ ] Migration 020 executada (coluna telefone existe)
 - [ ] Migration 021 executada (tabela whatsapp_notifications existe)
 - [ ] Migration 022 executada (colunas template_id e template_params existem)
-- [ ] Workflow n8n criado e ativo
-- [ ] Credenciais Supabase configuradas no n8n
+- [ ] Worker Node.js iniciado
+- [ ] Variáveis de ambiente configuradas
 - [ ] Provedor WhatsApp configurado (Evolution, Z-API, etc.)
 - [ ] Pedido de teste criado com telefone
 - [ ] Status mudado no admin
 - [ ] Notificação aparece na fila (status=pending)
-- [ ] n8n processa e marca como sent
+- [ ] Worker processa e marca como sent
 - [ ] WhatsApp recebido no celular
 
 ---
@@ -328,12 +186,11 @@ Vou mostrar exemplo genérico (você adapta conforme seu provedor):
    ```
 2. Se retornar vazio, re-execute a migration 021
 
-### Problema: n8n não busca notificações
-**Causa:** Credenciais Supabase incorretas
+### Problema: worker não busca notificações
+**Causa:** Variáveis do Supabase incorretas
 **Solução:**
-1. No n8n, edite o nó Postgres
-2. Teste a conexão clicando em "Test Connection"
-3. Se falhar, verifique host, senha, port no Supabase
+1. Verifique `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`
+2. Reinicie o worker
 
 ### Problema: HTTP Request falha
 **Causa:** URL ou formato do provedor WhatsApp incorreto
@@ -366,7 +223,6 @@ Após tudo funcionando:
 ## 📚 Referências
 
 - [Documentação Supabase](https://supabase.com/docs)
-- [Documentação n8n](https://docs.n8n.io/)
 - [Evolution API](https://evolution-api.com/docs)
 - [Z-API](https://z-api.io/docs)
 - [Meta WhatsApp Cloud API](https://developers.facebook.com/docs/whatsapp)

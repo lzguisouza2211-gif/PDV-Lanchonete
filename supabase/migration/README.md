@@ -8,7 +8,7 @@
 | 004 | 004_timestamps_pedidos.sql |
 | 005 | 0045_fix_indisponivel_col_ingredientes_indisponiveis_dia.sql |
 | 006 | 005_policies_rls.sql |
-| 007 | 006_whatsapp_n8n_trigger.sql |
+| 007 | 006_whatsapp_webhook_trigger.sql |
 | 008 | 007_tabela_fechamentos_caixa.sql |
 | 009 | 008_store_status.sql |
 | 010 | 009_pedidos_customizacao.sql |

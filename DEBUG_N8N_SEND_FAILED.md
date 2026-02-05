@@ -1,4 +1,4 @@
-# 🔍 Debug: Erro "send failed" no n8n
+# 🔍 Debug: Erro "send failed" no WhatsApp
 
 ## ✅ Telefone Está Correto
 ```
@@ -15,7 +15,7 @@
 
 **Como corrigir:**
 1. Gere um novo token permanente
-2. Atualize no n8n nas credenciais do WhatsApp
+2. Atualize o token usado pelo worker
 3. Reprocesse a notificação
 
 ### 2. **Número do WhatsApp não Verificado**
@@ -27,7 +27,7 @@
 **Sintoma:** Muitas mensagens em pouco tempo
 **Solução:** Aguardar alguns minutos e reprocessar
 
-### 4. **Formato da Requisição no n8n**
+### 4. **Formato da Requisição**
 Verifique se o node do WhatsApp está configurado assim:
 
 ```json
@@ -96,11 +96,9 @@ curl -X POST \
 }
 ```
 
-### Teste 2: Verificar logs do n8n
-1. No n8n, abra o workflow
-2. Execute manualmente
-3. Clique no node do WhatsApp
-4. Veja o OUTPUT e ERROR
+### Teste 2: Verificar logs do worker
+1. Verifique o terminal onde o worker está rodando
+2. Confira logs de envio e erros
 
 ---
 
@@ -130,7 +128,7 @@ INSERT INTO whatsapp_notifications (
   256, 
   'Teste', 
   '5535SEUNUMERO', -- SEU NÚMERO AQUI
-  '🧪 Teste de envio pelo n8n',
+  '🧪 Teste de envio pelo WhatsApp',
   'pending',
   NOW()
 );
@@ -147,11 +145,11 @@ Acesse: https://business.facebook.com/wa/manage/phone-numbers/
 
 ---
 
-## 📋 Configuração Completa do n8n
+## 📋 Configuração Completa do Worker
 
 ### Node 1: Webhook
 ```
-URL: https://seu-n8n.com/webhook/whatsapp
+URL: (não aplicável no worker)
 Method: POST
 ```
 
@@ -229,11 +227,11 @@ WHERE id = {{ $('Set').item.json.notification_id }}
 
 1. **Execute a migration 037** (escolha A ou B)
 2. **Teste o envio manual** via Postman/cURL
-3. **Verifique os logs do n8n** para erro específico
+3. **Verifique os logs do worker** para erro específico
 4. **Atualize o token** se necessário
 5. **Reprocesse as notificações** pendentes
 
 Se o erro persistir, compartilhe:
-- Log completo do n8n
+- Log completo do worker
 - Response da API do WhatsApp
 - Status do número no Facebook Business
