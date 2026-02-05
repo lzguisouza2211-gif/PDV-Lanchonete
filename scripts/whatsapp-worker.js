@@ -1,4 +1,7 @@
-require('dotenv').config();
+// Detecta ambiente e carrega .env correspondente
+const env = process.env.NODE_ENV || 'dev';
+const envFile = `.env.${env}`;
+require('dotenv').config({ path: envFile });
 
 const axios = require('axios');
 const cron = require('node-cron');
