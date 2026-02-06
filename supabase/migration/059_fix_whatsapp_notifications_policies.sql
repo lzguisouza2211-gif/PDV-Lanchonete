@@ -8,6 +8,7 @@ DROP POLICY IF EXISTS "Allow insert whatsapp_notifications" ON whatsapp_notifica
 DROP POLICY IF EXISTS "Allow update whatsapp_notifications admin" ON whatsapp_notifications;
 DROP POLICY IF EXISTS "Allow delete whatsapp_notifications admin" ON whatsapp_notifications;
 DROP POLICY IF EXISTS "Allow read whatsapp_notifications" ON whatsapp_notifications;
+DROP POLICY IF EXISTS "anon_can_insert_whatsapp_notifications" ON whatsapp_notifications;
 
 -- Recreate policies com regras corretas
 

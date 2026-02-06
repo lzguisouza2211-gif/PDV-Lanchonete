@@ -35,7 +35,7 @@ BEGIN
       'Pagamento: ' || COALESCE(NEW.formapagamento, 'não informado') || E'\n' ||
       'Tipo: ' || COALESCE(NEW.tipoentrega, 'não informado');
     INSERT INTO whatsapp_notifications
-      (pedido_id, cliente, phone, message, status_anterior, status_novo, created_at)
+      (pedido_id, cliente, phone, mensagem, status_anterior, status_novo, created_at)
     VALUES
       (NEW.id, NEW.cliente, NEW.phone, mensagem_cliente, NULL, NEW.status, NOW());
   ELSIF OLD.status IS DISTINCT FROM NEW.status THEN
@@ -52,7 +52,7 @@ BEGIN
     END IF;
 
     INSERT INTO whatsapp_notifications
-      (pedido_id, cliente, phone, message, status_anterior, status_novo, created_at)
+      (pedido_id, cliente, phone, mensagem, status_anterior, status_novo, created_at)
     VALUES
       (NEW.id, NEW.cliente, NEW.phone, mensagem_cliente, OLD.status, NEW.status, NOW());
   END IF;
