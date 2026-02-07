@@ -10,9 +10,9 @@
     "printer:server": "node printer-backend.js",
     "printer:cups": "node printer-backend-cups.js",
     "whatsapp:worker": "node scripts/whatsapp-worker.js",
-    "whatsapp:worker:dev": "NODE_ENV=dev node scripts/whatsapp-worker.js",
-    "whatsapp:worker:hml": "NODE_ENV=hml node scripts/whatsapp-worker.js",
-    "whatsapp:worker:prod": "NODE_ENV=prod node scripts/whatsapp-worker.js"
+    "whatsapp:worker:dev": "cross-env NODE_ENV=dev node scripts/whatsapp-worker.js",
+    "whatsapp:worker:hml": "cross-env NODE_ENV=hml node scripts/whatsapp-worker.js",
+    "whatsapp:worker:prod": "cross-env NODE_ENV=prod node scripts/whatsapp-worker.js"
   },
   "keywords": [],
   "author": "",
