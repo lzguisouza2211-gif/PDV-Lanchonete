@@ -8,6 +8,7 @@
 DROP POLICY IF EXISTS "authenticated_can_insert_whatsapp_notifications" ON whatsapp_notifications;
 DROP POLICY IF EXISTS "allow_trigger_insert_whatsapp_notifications" ON whatsapp_notifications;
 DROP POLICY IF EXISTS "allow_all_insert_whatsapp_notifications" ON whatsapp_notifications;
+DROP POLICY IF EXISTS "allow_select_whatsapp_notifications" ON whatsapp_notifications;
 
 -- Manter apenas policies seguras
 CREATE POLICY "allow_select_whatsapp_notifications"

@@ -24,10 +24,8 @@ begin
           'tipoentrega', new.tipoentrega,
           'endereco', new.endereco,
           'formapagamento', new.formapagamento
-        -- Migration 006
-        -- Criação de trigger para notificação de pedidos confirmados via N8N.
-        -- Data: 2026-01-28
         )
+      );
   end if;
 
   return new;

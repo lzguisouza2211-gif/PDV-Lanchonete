@@ -187,14 +187,25 @@ function buildRequest(notification) {
 async function sendWhatsApp(notification) {
   const request = buildRequest(notification);
   const timeout = Number(process.env.REQUEST_TIMEOUT_MS || DEFAULTS.REQUEST_TIMEOUT_MS);
-  const response = await axios({
-    method: 'POST',
-    url: request.url,
-    headers: request.headers,
-    data: request.data,
-    timeout
-  });
-  return response.data;
+  
+  log('INFO', `Calling WhatsApp API: ${request.url}`);
+  log('INFO', `Headers:`, JSON.stringify(request.headers, null, 2));
+  log('INFO', `Data:`, JSON.stringify(request.data, null, 2));
+  
+  try {
+    const response = await axios({
+      method: 'POST',
+      url: request.url,
+      headers: request.headers,
+      data: request.data,
+      timeout
+    });
+    return response.data;
+  } catch (error) {
+    const errorMsg = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+    log('ERROR', `WhatsApp API Error (${error.response?.status}):`, errorMsg);
+    throw error;
+  }
 }
 
 async function markNotification(supabase, id, status, errorMessage) {
