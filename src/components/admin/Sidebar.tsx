@@ -2,6 +2,8 @@ import { NavLink } from 'react-router-dom'
 import { supabase } from '../../services/supabaseClient'
 
 export default function Sidebar() {
+  const logoUrl = '/ChatGPT%20Image%207%20de%20fev.%20de%202026,%2011_28_27.png'
+
   async function sair() {
     await supabase.auth.signOut()
     window.location.href = '/admin/login'
@@ -41,16 +43,21 @@ export default function Sidebar() {
             width: 72,
             height: 72,
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, #c0392b 0%, #e74c3c 100%)',
+            background: '#fff',
             margin: '0 auto 16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 32,
-            boxShadow: '0 4px 12px rgba(192, 57, 43, 0.3)',
+            boxShadow: '0 4px 12px rgba(192, 57, 43, 0.2)',
+            border: '2px solid #f3f4f6',
+            overflow: 'hidden',
           }}
         >
-          🍔
+          <img
+            src={logoUrl}
+            alt="Luizão Lanches"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
         </div>
         <strong
           style={{
