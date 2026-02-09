@@ -1,3 +1,33 @@
+# Como iniciar a API do WhatsApp automaticamente no Windows
+
+Se você está usando o Windows, o comando `pm2 startup` não funciona para inicialização automática. Siga este passo a passo para garantir que o PM2 e sua API do WhatsApp iniciem automaticamente ao ligar o notebook:
+
+## 1. Salve o processo do PM2
+
+No terminal, execute:
+```bash
+pm2 save
+```
+
+## 2. Crie um script de restauração do PM2
+
+Crie um arquivo chamado `pm2-resurrect.bat` (por exemplo, na sua área de trabalho ou em C:\scripts) com o seguinte conteúdo:
+```bat
+@echo off
+pm2 resurrect
+```
+
+## 3. Adicione o script à inicialização do Windows
+
+1. Pressione `Win + R`, digite `shell:startup` e pressione Enter. Isso abrirá a pasta de inicialização do Windows.
+2. Coloque um atalho para o arquivo `pm2-resurrect.bat` dentro dessa pasta.
+
+Assim, sempre que o Windows iniciar, o PM2 irá restaurar e iniciar automaticamente todos os processos salvos, incluindo sua API do WhatsApp.
+
+---
+**Observação:**
+- Certifique-se de que o Node.js e o PM2 estejam no PATH do sistema.
+- Sempre que adicionar ou remover processos do PM2, execute novamente `pm2 save` para atualizar o snapshot.
 # Guia de Deploy - WhatsApp Worker e Sistema de Impressão
 
 Este guia explica como configurar e executar os sistemas de **notificação WhatsApp** e **impressão** tanto no seu ambiente de desenvolvimento (Linux) quanto na máquina do cliente (Windows).
