@@ -9,6 +9,7 @@ export default function PedidosAdmin() {
     usePedidosStore()
   const { atualizarStatus } = usePedidos()
   const { printProducao, printMotoboy } = usePrinter()
+  const handleChangeStatusRef = useRef<((id: number, status: string) => Promise<void>) | null>(null)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const initializedRef = useRef(false)
@@ -90,13 +91,14 @@ export default function PedidosAdmin() {
     carregar()
   }, [setPedidos])
 
-  // 📡 Realtime
+  // 📡 Realtime - Inscrição ao canal de pedidos
   useEffect(() => {
     console.log('🔌 Conectando ao canal de pedidos em tempo real...')
     
     const channel = supabase
       .channel('admin-pedidos')
 
+      // Listener para NOVO pedido
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'pedidos' },
@@ -135,6 +137,7 @@ export default function PedidosAdmin() {
         }
       )
 
+      // Listener para ATUALIZAÇÃO de pedido
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'pedidos' },
@@ -158,42 +161,26 @@ export default function PedidosAdmin() {
         }
       )
 
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pedidos' },
-        async (payload) => {
-          console.log('🆕 Novo pedido recebido via realtime:', payload.new)
-          const novoPedido = payload.new as any
-          // Buscar itens do novo pedido
-          const { data: itens, error: errorItens } = await supabase
-            .from('pedido_itens')
-            .select('*')
-            .eq('pedido_id', novoPedido.id)
-            .order('id', { ascending: true })
-          addPedido({ ...novoPedido, itens: !errorItens && itens ? itens : [] })
+      .subscribe()
 
-          // 🔔 Notificação do navegador
-          if (Notification.permission === 'granted') {
-            new Notification('🍔 Novo pedido recebido!', {
-              body: `Cliente: ${novoPedido.cliente}\nTotal: R$ ${Number(
-                novoPedido.total
-              ).toFixed(2)}`,
-              icon: '/icon-192.png',
-              badge: '/icon-192.png',
-            })
-          }
-          // 🔊 Som (se desbloqueado)
-          console.log('🔊 Tentando tocar som... Desbloqueado:', audioUnlockedRef.current)
-          if (audioRef.current && audioUnlockedRef.current) {
-            audioRef.current.currentTime = 0
-            audioRef.current.play().catch((err) => {
-              console.error('❌ Erro ao tocar som de notificação:', err)
-            })
-          } else if (!audioUnlockedRef.current) {
-            console.warn('⚠️ Áudio ainda não foi desbloqueado. Clique na página primeiro!')
-          }
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [addPedido, updatePedido])
+
+  // 🖨️ Handler para mudar status e imprimir
+  const handleChangeStatus = useCallback(
+    async (id: number, novoStatus: string) => {
+      try {
+        statusChangeRef.current[id] = novoStatus
+
+        let pedidoAtual = pedidos.find((p: any) => p.id === id)
+
+        if (!pedidoAtual) {
+          alert('Pedido não encontrado')
+          return
         }
-      )
+
         // Atualizar no banco via hook
         const sucesso = await atualizarStatus(id, novoStatus)
 
@@ -202,12 +189,32 @@ export default function PedidosAdmin() {
           delete statusChangeRef.current[id]
         } else {
           // Impressão automática ao passar para "Em preparo"
-          if (novoStatus === 'Em preparo' && pedidoAtual) {
+          if (novoStatus === 'Em preparo') {
+            // 🔥 GARANTIR QUE ITENS ESTÃO CARREGADOS ANTES DE IMPRIMIR
+            if (!pedidoAtual.itens || pedidoAtual.itens.length === 0) {
+              console.log('⚠️ Itens não carregados, buscando do banco...')
+              const { data: itens, error: errorItens } = await supabase
+                .from('pedido_itens')
+                .select('*')
+                .eq('pedido_id', id)
+                .order('id', { ascending: true })
+              
+              if (!errorItens && itens && itens.length > 0) {
+                pedidoAtual = { ...pedidoAtual, itens }
+                console.log('✅ Itens carregados:', itens.length, 'itens')
+              } else {
+                console.warn('⚠️ Nenhum item encontrado para este pedido')
+              }
+            }
+            
             // Imprime produção sempre
+            console.log('🖨️ Imprimindo produção...')
             printProducao(pedidoAtual)
+            
             // Se for entrega, imprime motoboy após pequeno delay
             if (pedidoAtual.tipoentrega === 'entrega') {
               setTimeout(() => {
+                console.log('🖨️ Imprimindo motoboy...')
                 printMotoboy(pedidoAtual)
               }, 1200) // 1.2s para dar tempo de destacar
             }
@@ -216,11 +223,17 @@ export default function PedidosAdmin() {
       } catch (error) {
         console.error('Erro ao atualizar status:', error)
         alert('Erro ao atualizar status')
-        delete statusChangeRef.current[id]
+        const statusChangeData = statusChangeRef.current
+        delete statusChangeData[id]
       }
     },
-    [pedidos, updatePedido, atualizarStatus, printProducao, printMotoboy]
+    [pedidos, atualizarStatus, printProducao, printMotoboy]
   )
+
+  // Guardar referência para usar em useMemo
+  useEffect(() => {
+    handleChangeStatusRef.current = handleChangeStatus
+  }, [handleChangeStatus])
 
   const formatEndereco = (pedido: any) => {
     const endereco = (pedido.endereco || '').trim()
@@ -348,7 +361,7 @@ export default function PedidosAdmin() {
         {/* Botões de atualização de status */}
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
           <button
-            onClick={() => handleChangeStatus(pedido.id, 'Em preparo')}
+            onClick={() => handleChangeStatusRef.current?.(pedido.id, 'Em preparo')}
             disabled={pedido.status === 'Em preparo'}
             style={{
               padding: '8px 16px',
@@ -365,7 +378,7 @@ export default function PedidosAdmin() {
           </button>
 
           <button
-            onClick={() => handleChangeStatus(pedido.id, 'Finalizado')}
+            onClick={() => handleChangeStatusRef.current?.(pedido.id, 'Finalizado')}
             disabled={pedido.status === 'Finalizado'}
             style={{
               padding: '8px 16px',
@@ -383,7 +396,7 @@ export default function PedidosAdmin() {
         </div>
       </div>
     ))
-  }, [pedidos, handleChangeStatus])
+  }, [pedidos])
 
   return (
     <div style={{ padding: 24 }}>
