@@ -192,7 +192,8 @@ export default function PedidosAdmin() {
           if (novoStatus === 'Em preparo') {
             // 🔥 GARANTIR QUE ITENS ESTÃO CARREGADOS ANTES DE IMPRIMIR
             if (!pedidoAtual.itens || pedidoAtual.itens.length === 0) {
-              console.log('⚠️ Itens não carregados, buscando do banco...')
+              console.log('⚠️ Itens não carregados, aguardando 600ms antes de buscar do banco...')
+              await new Promise(res => setTimeout(res, 600));
               const { data: itens, error: errorItens } = await supabase
                 .from('pedido_itens')
                 .select('*')
