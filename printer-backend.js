@@ -41,38 +41,27 @@ app.use(bodyParser.json({ limit: '1mb' }))
 
 async function writeToPrinter(rawText) {
   return new Promise((resolve, reject) => {
-    if (IS_WINDOWS && escpos && escposUSB) {
-      // Windows: usa escpos-usb para comunicação direta USB
-      try {
-        const device = new escpos.USB();
-        const printer = new escpos.Printer(device);
-        
-        device.open(function(err) {
-          if (err) return reject(err);
-          
-          printer
-            .raw(Buffer.from(rawText, 'utf8'))
-            .raw(Buffer.from('\n'))
-            .flush();
-          
-          if (ENABLE_CUT) {
-            printer.cut();
-          }
-          
-          printer.close(() => resolve());
-        });
-      } catch (err) {
-        reject(err);
-      }
-    } else if (!IS_WINDOWS) {
-      // Linux: escreve direto no device
-      const data = ENABLE_CUT ? `${rawText}\n\x1d\x56\x41` : `${rawText}\n`;
-      fs.writeFile(PRINTER_PATH, data, (err) => {
+    const data = ENABLE_CUT ? `${rawText}\n\x1d\x56\x41` : `${rawText}\n`;
+    
+    if (IS_WINDOWS) {
+      // Windows: cria arquivo PRN e copia para impressora via comando net use
+      const tempFile = `${os.tmpdir()}\\print_${Date.now()}.prn`;
+      fs.writeFileSync(tempFile, data, 'binary');
+      
+      // Usa notepad para imprimir (funciona com qualquer impressora Windows)
+      exec(`notepad /p "${tempFile}"`, (err) => {
+        setTimeout(() => {
+          try { fs.unlinkSync(tempFile); } catch(e) {}
+        }, 2000);
         if (err) return reject(err);
         resolve();
       });
     } else {
-      reject(new Error('Biblioteca escpos-usb não disponível no Windows'));
+      // Linux: escreve direto no device
+      fs.writeFile(PRINTER_PATH, data, (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
     }
   });
 }
