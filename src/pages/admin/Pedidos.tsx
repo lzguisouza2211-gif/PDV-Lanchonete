@@ -208,7 +208,14 @@ export default function PedidosAdmin() {
             }
             
             // Imprime produção sempre
-            console.log('🖨️ Imprimindo produção...')
+            console.log('🖨️ DEBUG IMPRESSAO: pedidoAtual:', JSON.stringify(pedidoAtual, null, 2))
+            if (pedidoAtual.itens && pedidoAtual.itens.length > 0) {
+              pedidoAtual.itens.forEach((item: any, idx: number) => {
+                console.log(`Item[${idx}]:`, item)
+              })
+            } else {
+              console.warn('⚠️ Nenhum item para imprimir!')
+            }
             printProducao(pedidoAtual)
             
             // Se for entrega, imprime motoboy após pequeno delay
