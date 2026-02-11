@@ -1,5 +1,5 @@
 // Detecta ambiente e carrega .env correspondente
-const env = process.env.NODE_ENV || 'dev';
+const env = process.env.NODE_ENV || 'prod';
 const envFile = `.env.${env}`;
 require('dotenv').config({ path: envFile });
 
