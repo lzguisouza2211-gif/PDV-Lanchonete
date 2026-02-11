@@ -48,6 +48,11 @@ export function usePrinter() {
         total: pedido.total || 0,
         isDelivery: pedido.tipoentrega === 'entrega',
       };
+      
+      console.log('🖨️ DEBUG IMPRESSAO:');
+      console.log('Pedido completo:', JSON.stringify(pedido, null, 2));
+      console.log('Order.items:', JSON.stringify(order.items, null, 2));
+      
       // Layout detalhado para produção
       // Função para formatar endereço separando rua, número e bairro
       function formatarEndereco(endereco: string | undefined) {
