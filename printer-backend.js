@@ -23,30 +23,56 @@ const API_PORT = Number(process.env.PRINTER_API_PORT || 4000)
 const ENABLE_CUT = (process.env.PRINTER_ENABLE_CUT || 'true') !== 'false'
 const FALLBACK_MODE = (process.env.PRINTER_FALLBACK_MODE || 'true') !== 'false'
 
+// Libs para impressão USB no Windows
+let escpos, escposUSB;
+if (IS_WINDOWS) {
+  try {
+    escpos = require('escpos');
+    escposUSB = require('escpos-usb');
+    escpos.USB = escposUSB;
+  } catch (e) {
+    console.warn('⚠️ Biblioteca escpos-usb não disponível:', e.message);
+  }
+}
+
 const app = express()
 app.use(cors())
 app.use(bodyParser.json({ limit: '1mb' }))
 
 async function writeToPrinter(rawText) {
   return new Promise((resolve, reject) => {
-    const data = ENABLE_CUT ? `${rawText}\n\x1d\x56\x41` : `${rawText}\n`;
-    
-    if (IS_WINDOWS) {
-      // Windows: usa PowerShell para enviar dados para impressora
-      const tempFile = `${os.tmpdir()}\\print_${Date.now()}.prn`;
-      fs.writeFileSync(tempFile, data, 'binary');
-      const psCommand = `Get-Content -Path "${tempFile}" -Encoding Byte -ReadCount 0 | Out-Printer -Name "${PRINTER_NAME}"`;
-      exec(`powershell -Command "${psCommand}"`, (err) => {
-        try { fs.unlinkSync(tempFile); } catch(e) {}
-        if (err) return reject(err);
-        resolve();
-      });
-    } else {
+    if (IS_WINDOWS && escpos && escposUSB) {
+      // Windows: usa escpos-usb para comunicação direta USB
+      try {
+        const device = new escpos.USB();
+        const printer = new escpos.Printer(device);
+        
+        device.open(function(err) {
+          if (err) return reject(err);
+          
+          printer
+            .raw(Buffer.from(rawText, 'utf8'))
+            .raw(Buffer.from('\n'))
+            .flush();
+          
+          if (ENABLE_CUT) {
+            printer.cut();
+          }
+          
+          printer.close(() => resolve());
+        });
+      } catch (err) {
+        reject(err);
+      }
+    } else if (!IS_WINDOWS) {
       // Linux: escreve direto no device
+      const data = ENABLE_CUT ? `${rawText}\n\x1d\x56\x41` : `${rawText}\n`;
       fs.writeFile(PRINTER_PATH, data, (err) => {
         if (err) return reject(err);
         resolve();
       });
+    } else {
+      reject(new Error('Biblioteca escpos-usb não disponível no Windows'));
     }
   });
 }
