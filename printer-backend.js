@@ -13,8 +13,12 @@ const express = require('express')
 const cors = require('cors')
 const bodyParser = require('body-parser')
 const fs = require('fs')
+const os = require('os')
+const { exec } = require('child_process')
 
-const PRINTER_PATH = process.env.PRINTER_PATH || '/dev/usb/lp1'
+const IS_WINDOWS = os.platform() === 'win32'
+const PRINTER_NAME = process.env.PRINTER_NAME || 'ELGIN'
+const PRINTER_PATH = process.env.PRINTER_PATH || (IS_WINDOWS ? 'USB001' : '/dev/usb/lp1')
 const API_PORT = Number(process.env.PRINTER_API_PORT || 4000)
 const ENABLE_CUT = (process.env.PRINTER_ENABLE_CUT || 'true') !== 'false'
 const FALLBACK_MODE = (process.env.PRINTER_FALLBACK_MODE || 'true') !== 'false'
@@ -26,10 +30,23 @@ app.use(bodyParser.json({ limit: '1mb' }))
 async function writeToPrinter(rawText) {
   return new Promise((resolve, reject) => {
     const data = ENABLE_CUT ? `${rawText}\n\x1d\x56\x41` : `${rawText}\n`;
-    fs.writeFile(PRINTER_PATH, data, (err) => {
-      if (err) return reject(err);
-      resolve();
-    });
+    
+    if (IS_WINDOWS) {
+      // Windows: cria arquivo temporário e envia para impressora
+      const tempFile = `${os.tmpdir()}\\print_${Date.now()}.txt`;
+      fs.writeFileSync(tempFile, data, 'utf8');
+      exec(`print /D:"${PRINTER_NAME}" "${tempFile}"`, (err) => {
+        fs.unlinkSync(tempFile);
+        if (err) return reject(err);
+        resolve();
+      });
+    } else {
+      // Linux: escreve direto no device
+      fs.writeFile(PRINTER_PATH, data, (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    }
   });
 }
 
@@ -56,11 +73,12 @@ app.post('/api/print', async (req, res) => {
 });
 
 app.get('/api/health', async (req, res) => {
-  // Checa se o arquivo da impressora existe
-  const printerAvailable = fs.existsSync(PRINTER_PATH);
+  // Checa se o arquivo da impressora existe (Linux) ou se está no Windows
+  const printerAvailable = IS_WINDOWS ? true : fs.existsSync(PRINTER_PATH);
   res.json({
     ok: true,
-    printerPath: PRINTER_PATH,
+    platform: os.platform(),
+    printerName: IS_WINDOWS ? PRINTER_NAME : PRINTER_PATH,
     printerAvailable,
     fallbackMode: FALLBACK_MODE,
   });
@@ -74,7 +92,9 @@ app.get('/api/ports', async (req, res) => {
 
 app.listen(API_PORT, async () => {
   console.log(`🖨️  Printer API rodando em http://localhost:${API_PORT}`);
-  console.log(`Configuração: ${PRINTER_PATH} | corte: ${ENABLE_CUT}`);
+  console.log(`Plataforma: ${os.platform()}`);
+  console.log(`Configuração: ${IS_WINDOWS ? `Impressora: ${PRINTER_NAME}` : `Device: ${PRINTER_PATH}`}`);
+  console.log(`Corte automático: ${ENABLE_CUT}`);
   console.log(`Modo fallback: ${FALLBACK_MODE ? 'ATIVO' : 'desativado'}`);
   console.log('');
   console.log('Endpoints disponíveis:');
