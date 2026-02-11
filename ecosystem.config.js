@@ -9,7 +9,13 @@ module.exports = {
     },
     {
       name: 'printer-backend',
-      script: 'printer-backend.js'
+      script: 'printer-backend.js',
+      env: {
+        PRINTER_NAME: 'ELGIN',
+        PRINTER_FALLBACK_MODE: 'false',
+        PRINTER_API_PORT: '4000',
+        PRINTER_ENABLE_CUT: 'true'
+      }
     }
   ]
 }
