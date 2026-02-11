@@ -32,11 +32,11 @@ async function writeToPrinter(rawText) {
     const data = ENABLE_CUT ? `${rawText}\n\x1d\x56\x41` : `${rawText}\n`;
     
     if (IS_WINDOWS) {
-      // Windows: cria arquivo temporário e envia diretamente para porta USB
+      // Windows: usa PowerShell para enviar dados para impressora
       const tempFile = `${os.tmpdir()}\\print_${Date.now()}.prn`;
       fs.writeFileSync(tempFile, data, 'binary');
-      // Copia direto para a porta da impressora
-      exec(`copy /B "${tempFile}" "\\\\.\\${PRINTER_PATH}"`, (err) => {
+      const psCommand = `Get-Content -Path "${tempFile}" -Encoding Byte -ReadCount 0 | Out-Printer -Name "${PRINTER_NAME}"`;
+      exec(`powershell -Command "${psCommand}"`, (err) => {
         try { fs.unlinkSync(tempFile); } catch(e) {}
         if (err) return reject(err);
         resolve();
