@@ -198,24 +198,20 @@ export default function PedidosAdmin() {
                 .select('*')
                 .eq('pedido_id', id)
                 .order('id', { ascending: true })
-              
+              console.log('🗂️ Resultado do fetch pedido_itens:', { itens, errorItens })
               if (!errorItens && itens && itens.length > 0) {
                 pedidoAtual = { ...pedidoAtual, itens }
                 console.log('✅ Itens carregados:', itens.length, 'itens')
               } else {
-                console.warn('⚠️ Nenhum item encontrado para este pedido')
+                console.warn('❌ Nenhum item encontrado para este pedido! Não será impresso.')
+                return
               }
             }
-            
             // Imprime produção sempre
             console.log('🖨️ DEBUG IMPRESSAO: pedidoAtual:', JSON.stringify(pedidoAtual, null, 2))
-            if (pedidoAtual.itens && pedidoAtual.itens.length > 0) {
-              pedidoAtual.itens.forEach((item: any, idx: number) => {
-                console.log(`Item[${idx}]:`, item)
-              })
-            } else {
-              console.warn('⚠️ Nenhum item para imprimir!')
-            }
+            pedidoAtual.itens.forEach((item: any, idx: number) => {
+              console.log(`Item[${idx}]:`, item)
+            })
             printProducao(pedidoAtual)
             
             // Se for entrega, imprime motoboy após pequeno delay
