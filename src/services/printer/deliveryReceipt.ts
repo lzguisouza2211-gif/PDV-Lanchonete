@@ -10,7 +10,7 @@ const STORE_NAME = 'Lanchonete Luizão';
  */
 export async function printDeliveryReceipt(order: Order, printer: escpos.Printer) {
   printer
-    .align('CT')
+    .align('LT')
     .style('B')
     .text(STORE_NAME)
     .style('NORMAL')
@@ -19,26 +19,24 @@ export async function printDeliveryReceipt(order: Order, printer: escpos.Printer
     .text(separatorLine())
     .text('');
 
-  // Cabeçalho dos itens
-  printer.text(alignLeftRight('Item', 'Valor', 32));
+  printer.text(alignLeftRight('Item', 'Valor', 48));
 
-
+  const seen = new Set();
   for (const item of order.items) {
-    // Nome à esquerda, quantidade centralizada, preço à direita
-    printer.text(formatItemLine({ name: item.name, quantity: item.quantity, price: undefined }, 32, { showPrice: false, centerQty: false }));
-    // Adicionais
-    if (item.adicionais && item.adicionais.length > 0) {
-      for (const add of item.adicionais) {
+    const key = item.name + (item.observations || '') + JSON.stringify(item.addons || []) + JSON.stringify(item.removes || []);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    printer.text(formatItemLine({ name: item.name, quantity: item.quantity, price: item.price }, 48, { showPrice: true, centerQty: false }));
+    if (item.addons && item.addons.length > 0) {
+      for (const add of item.addons) {
         printer.text('   + ' + add.nome);
       }
     }
-    // Retirados
-    if (item.retirados && item.retirados.length > 0) {
-      for (const ret of item.retirados) {
+    if (item.removes && item.removes.length > 0) {
+      for (const ret of item.removes) {
         printer.text('   - Sem ' + ret.nome);
       }
     }
-    // Observações (opcional)
     if (item.observations) {
       printer.text('  Obs: ' + item.observations);
     }

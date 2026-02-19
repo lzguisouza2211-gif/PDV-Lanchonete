@@ -9,7 +9,7 @@ import { separatorLine, formatItemLine } from '../../utils/receiptLayout';
  */
 export async function printProductionReceipt(order: Order, printer: escpos.Printer) {
   printer
-    .align('CT')
+    .align('LT')
     .style('B')
     .size(2, 2)
     .text('PRODUÇÃO')
@@ -21,17 +21,19 @@ export async function printProductionReceipt(order: Order, printer: escpos.Print
     .text(separatorLine())
     .text('');
 
+  const seen = new Set();
   for (const item of order.items) {
-    printer.text(formatItemLine({ name: item.name, quantity: item.quantity }));
-    // Adicionais
-    if (item.adicionais && item.adicionais.length > 0) {
-      for (const add of item.adicionais) {
+    const key = item.name + (item.observations || '') + JSON.stringify(item.addons || []) + JSON.stringify(item.removes || []);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    printer.text(formatItemLine({ name: item.name, quantity: item.quantity }, 48));
+    if (item.addons && item.addons.length > 0) {
+      for (const add of item.addons) {
         printer.text('   + ' + add.nome);
       }
     }
-    // Retirados
-    if (item.retirados && item.retirados.length > 0) {
-      for (const ret of item.retirados) {
+    if (item.removes && item.removes.length > 0) {
+      for (const ret of item.removes) {
         printer.text('   - Sem ' + ret.nome);
       }
     }

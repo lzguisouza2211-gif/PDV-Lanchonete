@@ -4,7 +4,6 @@
 
 import { useCallback, useState } from 'react'
 import { Pedido } from '../services/api/pedidos.service'
-import { Order } from '../types/index';
 import { printQueue } from '../services/printer/printQueue'
 import { supabase } from '../services/supabaseClient'
 
@@ -334,19 +333,17 @@ export function usePrinter() {
   /**
    * Imprime ticket completo
    */
+  // Função placeholder: não usar mais elginPrinter.generateCompleto
   const printCompleto = useCallback(async (pedido: Pedido) => {
     setStatus((s) => ({ ...s, isLoading: true, error: null }))
-
     try {
-      const content = elginPrinter.generateCompleto(pedido)
-      await printQueue.addJob('producao', { pedido, content }, 3)
-
+      // Apenas adiciona o pedido na fila, sem formatação especial
+      await printQueue.addJob('producao', { pedido, content: JSON.stringify(pedido) }, 3)
       setStatus((s) => ({
         ...s,
         isLoading: false,
         lastPrintedId: pedido.id,
       }))
-
       return true
     } catch (error: any) {
       const errorMessage = error?.message || 'Erro ao imprimir'
