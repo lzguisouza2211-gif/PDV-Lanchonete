@@ -6,6 +6,7 @@ import { useCallback, useState } from 'react'
 import { Pedido } from '../services/api/pedidos.service'
 import { Order } from '../types/index';
 import { printQueue } from '../services/printer/printQueue'
+import { supabase } from '../services/supabaseClient'
 
 interface PrintStatus {
   isLoading: boolean
@@ -93,6 +94,20 @@ export function usePrinter() {
         return linha;
       }
 
+      let itensFormatados = order.items.map(formatarItemProducao).join('\n')
+
+      // Buscar itens formatados via RPC (mesma abordagem do WhatsApp)
+      try {
+        const { data, error } = await supabase.rpc('format_pedido_itens_from_table', {
+          pedido_id: pedido.id,
+        })
+        if (!error && typeof data === 'string' && data.trim() !== '') {
+          itensFormatados = data
+        }
+      } catch (rpcError) {
+        console.warn('Falha ao buscar itens via RPC, usando fallback local:', rpcError)
+      }
+
       const texto =
         '==============================\n' +
         '        Luizao Lanches         \n' +
@@ -108,7 +123,7 @@ export function usePrinter() {
         '\n' +
         '------------------------------\n' +
         'Itens:\n' +
-        order.items.map(formatarItemProducao).join('\n') +
+        itensFormatados +
         '\n' +
         '------------------------------\n' +
         `Subtotal: R$ ${order.subtotal.toFixed(2)}\n` +
