@@ -209,8 +209,8 @@ export function usePrinter() {
 
       const texto =
         `${separator}\n` +
-        'Luizao Lanches\n' +
-        'PRODUCAO / COZINHA\n' +
+        `Luizao Lanches\n` +
+        `PRODUCAO / COZINHA\n` +
         `${separator}\n` +
         `PEDIDO #${order.orderNumber}\n` +
         `Data: ${new Date(order.createdAt).toLocaleString('pt-BR')}\n` +
@@ -288,8 +288,8 @@ export function usePrinter() {
 
       const texto =
         `${separator}\n` +
-        'Luizao Lanches\n' +
-        'ENTREGA / MOTOBOY\n' +
+        `Luizao Lanches\n` +
+        `ENTREGA / MOTOBOY\n` +
         `${separator}\n` +
         `PEDIDO #${order.orderNumber}\n` +
         `Data: ${new Date(order.createdAt).toLocaleString('pt-BR')}\n` +
