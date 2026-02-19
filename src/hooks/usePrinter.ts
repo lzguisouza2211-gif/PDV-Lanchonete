@@ -15,11 +15,6 @@ interface PrintStatus {
   queueSize: number
 }
 
-function centerText(text: string, width: number) {
-  if (text.length >= width) return text
-  const pad = Math.floor((width - text.length) / 2)
-  return ' '.repeat(pad) + text
-}
 
 function getItemKey(item: any) {
   const nome = item.nome || item.name || ''
@@ -75,7 +70,7 @@ function formatItemDetalhes(item: any) {
   return linha
 }
 
-function formatItensPorCategoria(items: any[], width: number) {
+function formatItensPorCategoria(items: any[], _width: number) {
   if (!Array.isArray(items) || items.length === 0) return ''
   const consolidado = consolidateItems(items)
   const grupos = new Map<string, any[]>()
@@ -88,7 +83,7 @@ function formatItensPorCategoria(items: any[], width: number) {
 
   const partes: string[] = []
   for (const [categoria, itensCat] of grupos.entries()) {
-    partes.push(centerText(categoria.toUpperCase(), width))
+    partes.push(categoria.toUpperCase())
     for (const item of itensCat) {
       partes.push(formatItemDetalhes(item))
     }
@@ -100,6 +95,24 @@ function formatItensPorCategoria(items: any[], width: number) {
   }
 
   return partes.join('\n')
+}
+
+function dedupeLines(text: string) {
+  if (!text) return text
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const line of text.split('\n')) {
+    const key = line.trim()
+    if (!key) {
+      result.push(line)
+      continue
+    }
+    if (!seen.has(key)) {
+      seen.add(key)
+      result.push(line)
+    }
+  }
+  return result.join('\n')
 }
 
 export function usePrinter() {
@@ -170,6 +183,8 @@ export function usePrinter() {
       if (!itensFormatados) {
         itensFormatados = order.items.map(formatItemDetalhes).join('\n')
       }
+      itensFormatados = dedupeLines(itensFormatados)
+      itensFormatados = dedupeLines(itensFormatados)
 
       // Buscar itens formatados via RPC (mesma abordagem do WhatsApp)
       try {
@@ -195,8 +210,8 @@ export function usePrinter() {
 
       const texto =
         `${separator}\n` +
-        `${centerText('Luizao Lanches', receiptWidth)}\n` +
-        `${centerText('PRODUCAO / COZINHA', receiptWidth)}\n` +
+        'Luizao Lanches\n' +
+        'PRODUCAO / COZINHA\n' +
         `${separator}\n` +
         `PEDIDO #${order.orderNumber}\n` +
         `Data: ${new Date(order.createdAt).toLocaleString('pt-BR')}\n` +
@@ -274,8 +289,8 @@ export function usePrinter() {
 
       const texto =
         `${separator}\n` +
-        `${centerText('Luizao Lanches', receiptWidth)}\n` +
-        `${centerText('ENTREGA / MOTOBOY', receiptWidth)}\n` +
+        'Luizao Lanches\n' +
+        'ENTREGA / MOTOBOY\n' +
         `${separator}\n` +
         `PEDIDO #${order.orderNumber}\n` +
         `Data: ${new Date(order.createdAt).toLocaleString('pt-BR')}\n` +

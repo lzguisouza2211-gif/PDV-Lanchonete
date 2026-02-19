@@ -41,7 +41,9 @@ app.use(bodyParser.json({ limit: '1mb' }))
 
 async function writeToPrinter(rawText) {
   return new Promise((resolve, reject) => {
-    const data = ENABLE_CUT ? `${rawText}\n\x1d\x56\x41` : `${rawText}\n`;
+    // ESC/POS init + fonte A + largura de impressão 80mm (576 dots) + margem esquerda 0
+    const init = '\x1b\x40\x1b\x4d\x00\x1d\x57\x40\x02\x1d\x4c\x00\x00';
+    const data = ENABLE_CUT ? `${init}${rawText}\n\x1d\x56\x41` : `${init}${rawText}\n`;
     
     if (IS_WINDOWS) {
       // Windows: cria arquivo PRN e copia para impressora via comando net use
