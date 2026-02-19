@@ -79,10 +79,10 @@ export function usePrinter() {
         let linha = `- ${item.quantity}x ${item.name}`;
         let detalhes: string[] = [];
         if (item.addons && item.addons.length > 0) {
-          detalhes.push('Adicionais: ' + item.addons.map((a: any) => a.name).join(', '));
+          detalhes.push('Adicionais: ' + item.addons.map((a: any) => a.nome || a.name).join(', '));
         }
         if (item.removes && item.removes.length > 0) {
-          detalhes.push('Retirar: ' + item.removes.map((r: any) => r.name).join(', '));
+          detalhes.push('Retirar: ' + item.removes.map((r: any) => r.nome || r.name).join(', '));
         }
         if (item.observations) {
           detalhes.push('Obs: ' + item.observations);
