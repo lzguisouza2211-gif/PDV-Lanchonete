@@ -15,6 +15,93 @@ interface PrintStatus {
   queueSize: number
 }
 
+function centerText(text: string, width: number) {
+  if (text.length >= width) return text
+  const pad = Math.floor((width - text.length) / 2)
+  return ' '.repeat(pad) + text
+}
+
+function getItemKey(item: any) {
+  const nome = item.nome || item.name || ''
+  const observacoes = item.observacoes || item.observations || ''
+  const categoria = item.categoria || 'Itens'
+  const adicionais = (item.adicionais || item.addons || [])
+    .map((a: any) => a.nome || a.name)
+    .sort()
+    .join('|')
+  const retirados = (item.retirados || item.removes || [])
+    .map((r: any) => r.nome || r.name)
+    .sort()
+    .join('|')
+  return [categoria, nome, observacoes, adicionais, retirados].join('||')
+}
+
+function consolidateItems(items: any[]) {
+  const map = new Map<string, any>()
+  for (const item of items) {
+    const key = getItemKey(item)
+    const quantidade = item.quantidade ?? item.quantity ?? 1
+    if (map.has(key)) {
+      const existente = map.get(key)
+      existente.quantidade = (existente.quantidade ?? existente.quantity ?? 1) + quantidade
+    } else {
+      map.set(key, { ...item, quantidade })
+    }
+  }
+  return Array.from(map.values())
+}
+
+function formatItemDetalhes(item: any) {
+  const nome = item.nome || item.name || ''
+  const quantidade = item.quantidade ?? item.quantity ?? 1
+  let linha = `${quantidade}x ${nome}`
+
+  const detalhes: string[] = []
+  const adicionais = item.adicionais || item.addons || []
+  if (Array.isArray(adicionais) && adicionais.length > 0) {
+    detalhes.push('Adicionais: ' + adicionais.map((a: any) => a.nome || a.name).join(', '))
+  }
+  const retirados = item.retirados || item.removes || []
+  if (Array.isArray(retirados) && retirados.length > 0) {
+    detalhes.push('Retirar: ' + retirados.map((r: any) => r.nome || r.name).join(', '))
+  }
+  const observacoes = item.observacoes || item.observations
+  if (observacoes) {
+    detalhes.push('Obs: ' + observacoes)
+  }
+  if (detalhes.length > 0) {
+    linha += '\n  ' + detalhes.join(' | ')
+  }
+  return linha
+}
+
+function formatItensPorCategoria(items: any[], width: number) {
+  if (!Array.isArray(items) || items.length === 0) return ''
+  const consolidado = consolidateItems(items)
+  const grupos = new Map<string, any[]>()
+
+  for (const item of consolidado) {
+    const categoria = (item.categoria || 'Itens').toString()
+    if (!grupos.has(categoria)) grupos.set(categoria, [])
+    grupos.get(categoria)!.push(item)
+  }
+
+  const partes: string[] = []
+  for (const [categoria, itensCat] of grupos.entries()) {
+    partes.push(centerText(categoria.toUpperCase(), width))
+    for (const item of itensCat) {
+      partes.push(formatItemDetalhes(item))
+    }
+    partes.push('')
+  }
+
+  if (partes.length > 0 && partes[partes.length - 1] === '') {
+    partes.pop()
+  }
+
+  return partes.join('\n')
+}
+
 export function usePrinter() {
   const [status, setStatus] = useState<PrintStatus>({
     isLoading: false,
@@ -75,62 +162,57 @@ export function usePrinter() {
         return resultado;
       }
 
-      // Função para formatar cada item, incluindo adicionais, retiradas e observações
-      function formatarItemProducao(item: any) {
-        let linha = `- ${item.quantity}x ${item.name}`;
-        let detalhes: string[] = [];
-        if (item.addons && item.addons.length > 0) {
-          detalhes.push('Adicionais: ' + item.addons.map((a: any) => a.nome || a.name).join(', '));
-        }
-        if (item.removes && item.removes.length > 0) {
-          detalhes.push('Retirar: ' + item.removes.map((r: any) => r.nome || r.name).join(', '));
-        }
-        if (item.observations) {
-          detalhes.push('Obs: ' + item.observations);
-        }
-        if (detalhes.length > 0) {
-          linha += '\n    ' + detalhes.join(' | ');
-        }
-        return linha;
-      }
+      const receiptWidth = 48
+      const separator = '='.repeat(receiptWidth)
+      const dashLine = '-'.repeat(receiptWidth)
 
-      let itensFormatados = order.items.map(formatarItemProducao).join('\n')
+      let itensFormatados = formatItensPorCategoria(pedido.itens || [], receiptWidth)
+      if (!itensFormatados) {
+        itensFormatados = order.items.map(formatItemDetalhes).join('\n')
+      }
 
       // Buscar itens formatados via RPC (mesma abordagem do WhatsApp)
       try {
         const { data, error } = await supabase.rpc('format_pedido_itens_from_table', {
           pedido_id: pedido.id,
         })
-        if (!error && typeof data === 'string' && data.trim() !== '') {
+        if (!itensFormatados && !error && typeof data === 'string' && data.trim() !== '') {
           itensFormatados = data
         }
       } catch (rpcError) {
         console.warn('Falha ao buscar itens via RPC, usando fallback local:', rpcError)
       }
 
+      // Remove linhas duplicadas consecutivas (evita itens duplicados)
+      const linhas = itensFormatados.split('\n')
+      const linhasDedup: string[] = []
+      for (const linha of linhas) {
+        if (linhasDedup.length === 0 || linha !== linhasDedup[linhasDedup.length - 1]) {
+          linhasDedup.push(linha)
+        }
+      }
+      itensFormatados = linhasDedup.join('\n')
+
       const texto =
-        '==============================\n' +
-        '        Luizao Lanches         \n' +
-        '      PRODUCAO / COZINHA      \n' +
-        '==============================\n' +
+        `${separator}\n` +
+        `${centerText('Luizao Lanches', receiptWidth)}\n` +
+        `${centerText('PRODUCAO / COZINHA', receiptWidth)}\n` +
+        `${separator}\n` +
         `PEDIDO #${order.orderNumber}\n` +
         `Data: ${new Date(order.createdAt).toLocaleString('pt-BR')}\n` +
-        '\n' +
-        '------------------------------\n' +
+        `${dashLine}\n` +
         `Cliente: ${order.customerName || '-'}\n` +
         (order.customerPhone ? `Fone: ${order.customerPhone}\n` : '') +
         (order.deliveryAddress ? formatarEndereco(order.deliveryAddress) + '\n' : '') +
-        '\n' +
-        '------------------------------\n' +
-        'Itens:\n' +
+        `${dashLine}\n` +
+        'ITENS:\n' +
         itensFormatados +
         '\n' +
-        '------------------------------\n' +
-        `Subtotal: R$ ${order.subtotal.toFixed(2)}\n` +
+        `${dashLine}\n` +
         (order.deliveryFee ? `Entrega: R$ ${order.deliveryFee.toFixed(2)}\n` : '') +
-        `TOTAL: R$ ${order.total.toFixed(2)}\n` +
         `Pagamento: ${order.paymentMethod || '-'}\n` +
-        '==============================\n' +
+        `TOTAL: R$ ${order.total.toFixed(2)}\n` +
+        `${separator}\n` +
         '\n\n\n\n\n\n\n\n\n\n\n'; // Espaço extra no final
       const response = await fetch('http://localhost:4000/api/print', {
         method: 'POST',
@@ -181,30 +263,35 @@ export function usePrinter() {
         total: pedido.total || 0,
         isDelivery: pedido.tipoentrega === 'entrega',
       };
-      // Layout detalhado para entrega
+      // Layout detalhado para entrega (80mm / 48 colunas)
+      const receiptWidth = 48
+      const separator = '='.repeat(receiptWidth)
+      const dashLine = '-'.repeat(receiptWidth)
+      let itensFormatados = formatItensPorCategoria(pedido.itens || [], receiptWidth)
+      if (!itensFormatados) {
+        itensFormatados = order.items.map(formatItemDetalhes).join('\n')
+      }
+
       const texto =
-        '==============================\n' +
-        '        Luizao Lanches         \n' +
-        '     ENTREGA / MOTOBOY        \n' +
-        '==============================\n' +
+        `${separator}\n` +
+        `${centerText('Luizao Lanches', receiptWidth)}\n` +
+        `${centerText('ENTREGA / MOTOBOY', receiptWidth)}\n` +
+        `${separator}\n` +
         `PEDIDO #${order.orderNumber}\n` +
         `Data: ${new Date(order.createdAt).toLocaleString('pt-BR')}\n` +
-        '\n' +
-        '------------------------------\n' +
+        `${dashLine}\n` +
         `Cliente: ${order.customerName || '-'}\n` +
         (order.customerPhone ? `Fone: ${order.customerPhone}\n` : '') +
         (order.deliveryAddress ? `Endereço: ${order.deliveryAddress}\n` : '') +
+        `${dashLine}\n` +
+        'ITENS:\n' +
+        itensFormatados +
         '\n' +
-        '------------------------------\n' +
-        'Itens:\n' +
-        order.items.map(i => `- ${i.quantity}x ${i.name}${i.observations ? ' ('+i.observations+')' : ''}`).join('\n') +
-        '\n' +
-        '------------------------------\n' +
-        `Subtotal: R$ ${order.subtotal.toFixed(2)}\n` +
+        `${dashLine}\n` +
         (order.deliveryFee ? `Entrega: R$ ${order.deliveryFee.toFixed(2)}\n` : '') +
-        `TOTAL: R$ ${order.total.toFixed(2)}\n` +
         `Pagamento: ${order.paymentMethod || '-'}\n` +
-        '==============================\n' +
+        `TOTAL: R$ ${order.total.toFixed(2)}\n` +
+        `${separator}\n` +
         '\n\n\n\n\n\n\n\n\n\n\n'; // Espaço extra no final
       const response = await fetch('http://localhost:4000/api/print', {
         method: 'POST',
