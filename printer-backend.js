@@ -39,24 +39,80 @@ const app = express()
 app.use(cors())
 app.use(bodyParser.json({ limit: '1mb' }))
 
+
+// --- Helpers de formatação ESC/POS ---
+
+// Remove acentos e caracteres incompatíveis com ESC/POS (ASCII)
+function normalizeText(text) {
+  if (!text) return '';
+  // Remove acentos e converte para ASCII
+  return text.normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacríticos
+    .replace(/[^\x20-\x7E\n]/g, '?'); // Substitui não-ASCII exceto \n
+}
+
+// Quebra texto em linhas de no máximo 'width' caracteres
+function wrapText(text, width) {
+  if (!text) return [];
+  const lines = [];
+  let line = '';
+  for (const word of text.split(/\s+/)) {
+    if ((line + (line ? ' ' : '') + word).length > width) {
+      if (line) lines.push(line);
+      line = word.length > width ? word.slice(0, width) : word;
+    } else {
+      line += (line ? ' ' : '') + word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// Centraliza texto na largura
+function centerText(text, width) {
+  text = normalizeText(text);
+  if (text.length >= width) return text.slice(0, width);
+  const pad = width - text.length;
+  const left = Math.floor(pad / 2);
+  const right = pad - left;
+  return ' '.repeat(left) + text + ' '.repeat(right);
+}
+
+// Alinha esquerda/direita
+function alignLeftRight(left, right, width) {
+  left = normalizeText(left);
+  right = normalizeText(right);
+  const space = width - left.length - right.length;
+  if (space < 0) return (left + ' ' + right).slice(0, width);
+  return left + ' '.repeat(space) + right;
+}
+
+// Detecta largura real da impressora (Elgin i8: 32 ou 48 colunas)
+function detectPrinterWidth() {
+  // Tenta detectar via env, senão assume 32 (mais seguro para Elgin i8)
+  const envWidth = Number(process.env.PRINTER_WIDTH);
+  if (envWidth === 32 || envWidth === 48) return envWidth;
+  // Heurística: se caminho padrão, assume 32, senão 48
+  if (PRINTER_PATH.includes('lp1') || PRINTER_PATH.includes('usb')) return 32;
+  return 48;
+}
+
+// Envia texto ESC/POS para impressora, garantindo encoding correto
 async function writeToPrinter(rawText) {
   return new Promise((resolve, reject) => {
-    // ESC/POS commands:
-    // \x1B@ = Reset
-    // \x1B\x61\x00 = Align LEFT (ESC a 0)
-    // \x1B\x4D\x00 = Font A
-    // \x1D\x57\x40\x02 = Print width 80mm
-    // \x1D\x4C\x00\x00 = Left margin 0
-    // \x1D\x56\x41 = Cut paper
-    const init = '\x1B@\x1B\x61\x00\x1B\x4D\x00\x1D\x57\x40\x02\x1D\x4C\x00\x00';
-    const data = ENABLE_CUT ? `${init}${rawText}\n\x1D\x56\x41` : `${init}${rawText}\n`;
-    
+    // ESC/POS: Reset, alinhamento, fonte A, largura padrão, margem 0
+    const WIDTH = detectPrinterWidth();
+    // Comando para largura: 32 colunas = 58mm, 48 colunas = 80mm
+    const widthCmd = WIDTH === 48 ? '\x1D\x57\x40\x02' : '\x1D\x57\x80\x01';
+    const init = '\x1B@\x1B\x61\x00\x1B\x4D\x00' + widthCmd + '\x1D\x4C\x00\x00';
+    // Normaliza texto para ASCII seguro
+    const safeText = normalizeText(rawText);
+    const data = ENABLE_CUT ? `${init}${safeText}\n\x1D\x56\x41` : `${init}${safeText}\n`;
+
     if (IS_WINDOWS) {
       // Windows: cria arquivo PRN e copia para impressora via comando net use
       const tempFile = `${os.tmpdir()}\\print_${Date.now()}.prn`;
       fs.writeFileSync(tempFile, data, 'binary');
-      
-      // Usa notepad para imprimir (funciona com qualquer impressora Windows)
       exec(`notepad /p "${tempFile}"`, (err) => {
         setTimeout(() => {
           try { fs.unlinkSync(tempFile); } catch(e) {}
@@ -65,8 +121,8 @@ async function writeToPrinter(rawText) {
         resolve();
       });
     } else {
-      // Linux: escreve direto no device
-      fs.writeFile(PRINTER_PATH, data, (err) => {
+      // Linux: escreve direto no device, encoding ASCII
+      fs.writeFile(PRINTER_PATH, data, { encoding: 'ascii' }, (err) => {
         if (err) return reject(err);
         resolve();
       });
@@ -74,118 +130,83 @@ async function writeToPrinter(rawText) {
   });
 }
 
-// Formata pedido em texto para impressão (ELGIN I8: 48 colunas)
+
+// Formata pedido em texto para impressão (ajustado para Elgin i8)
 function formatPedidoReceipt(pedido) {
+  const WIDTH = detectPrinterWidth();
   const linhas = [];
-  const WIDTH = 48; // Largura máxima da impressora térmica
-  
-  // Separadores (48 caracteres)
   const sep = '='.repeat(WIDTH);
   const sepDash = '-'.repeat(WIDTH);
-  
-  // Helper para centralizar texto
-  function center(text, width = WIDTH) {
-    const padding = Math.max(0, width - text.length);
-    const left = Math.floor(padding / 2);
-    const right = padding - left;
-    return ' '.repeat(left) + text + ' '.repeat(right);
-  }
-  
-  // Helper para alinhar esquerda e direita
-  function alignLR(left, right, width = WIDTH) {
-    const space = width - left.length - right.length;
-    return left + ' '.repeat(Math.max(0, space)) + right;
-  }
-  
+
   linhas.push(sep);
-  linhas.push(center('PEDIDO DE PRODUCAO'));
+  linhas.push(centerText('PEDIDO DE PRODUCAO', WIDTH));
   linhas.push(sep);
   linhas.push('');
-  
-  linhas.push('PEDIDO #' + (pedido.pedidoId || 'SEM ID'));
-  
+
+  linhas.push(alignLeftRight('PEDIDO #', (pedido.pedidoId || 'SEM ID').toString(), WIDTH));
+
   if (pedido.cliente) {
-    const cliente = pedido.cliente;
-    if (cliente.length > WIDTH - 2) {
-      linhas.push(cliente.substring(0, WIDTH - 2) + '...');
-    } else {
-      linhas.push(cliente);
-    }
+    wrapText(pedido.cliente, WIDTH).forEach(l => linhas.push(l));
   }
-  
+
   linhas.push('');
   linhas.push(sepDash);
-  
+
   // Itens
   if (Array.isArray(pedido.items) && pedido.items.length > 0) {
     pedido.items.forEach(item => {
       const qtd = (item.quantidade || 1).toString().padStart(2, ' ');
       let nome = item.nome || 'Item sem nome';
-      
-      // Se nome é muito longo, truncar
-      const maxNome = WIDTH - 7; // 2 (qtd) + 2 (x ) + 3 espaços
-      if (nome.length > maxNome) {
-        nome = nome.substring(0, maxNome - 1) + '…';
-      }
-      
-      linhas.push(qtd + 'x ' + nome);
-      
+      nome = normalizeText(nome);
+      // Nome do item pode ser longo, quebra se necessário
+      const itemLine = `${qtd}x ${nome}`;
+      wrapText(itemLine, WIDTH).forEach((l, i) => linhas.push(i === 0 ? l : ' '.repeat(4) + l));
+
+      // Observação do item
       if (item.observacao) {
-        const obs = item.observacao;
-        if (obs.length > WIDTH - 6) {
-          linhas.push('  Obs: ' + obs.substring(0, WIDTH - 9) + '…');
-        } else {
-          linhas.push('  Obs: ' + obs);
-        }
+        wrapText('Obs: ' + item.observacao, WIDTH - 2).forEach(l => linhas.push('  ' + l));
       }
-      
+
+      // Adicionais
       if (item.adicionais && item.adicionais.length > 0) {
         item.adicionais.forEach(add => {
-          const adText = (add || '').substring(0, WIDTH - 5);
-          linhas.push('    + ' + adText);
+          wrapText('+ ' + add, WIDTH - 4).forEach(l => linhas.push('    ' + l));
         });
       }
     });
   }
-  
+
   linhas.push(sepDash);
   linhas.push('');
-  
+
   // Total
   if (pedido.total !== undefined) {
-    const total = typeof pedido.total === 'number' 
+    const total = typeof pedido.total === 'number'
       ? pedido.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
       : pedido.total;
-    linhas.push(alignLR('TOTAL:', total));
+    linhas.push(alignLeftRight('TOTAL:', total, WIDTH));
   }
-  
+
   // Pagamento
   if (pedido.pagamento) {
-    const pag = pedido.pagamento.toUpperCase();
-    linhas.push(alignLR('PAG:', pag));
+    const pag = (pedido.pagamento || '').toUpperCase();
+    linhas.push(alignLeftRight('PAG:', pag, WIDTH));
   }
-  
+
   // Observações gerais
   if (pedido.observacao) {
     linhas.push('');
-    linhas.push(center('OBSERVACOES'));
-    const obs = pedido.observacao;
-    if (obs.length > WIDTH - 2) {
-      // Quebrar em múltiplas linhas
-      for (let i = 0; i < obs.length; i += WIDTH - 2) {
-        linhas.push(obs.substring(i, i + WIDTH - 2));
-      }
-    } else {
-      linhas.push(obs);
-    }
+    linhas.push(centerText('OBSERVACOES', WIDTH));
+    wrapText(pedido.observacao, WIDTH).forEach(l => linhas.push(l));
   }
-  
+
   linhas.push('');
   linhas.push(sep);
   linhas.push('');
   linhas.push('');
-  
-  return linhas.join('\n');
+
+  // Normaliza todas as linhas para ASCII seguro
+  return linhas.map(normalizeText).join('\n');
 }
 
 app.post('/api/print', async (req, res) => {
