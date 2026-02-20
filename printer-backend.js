@@ -97,31 +97,41 @@ function detectPrinterWidth() {
   return 48;
 }
 
-// Envia texto ESC/POS para impressora, garantindo encoding correto
+// Envia texto ESC/POS puro para impressora térmica Elgin i8
+// Windows: usa escpos/escpos-usb (USB)
+// Linux: escreve direto no device
 async function writeToPrinter(rawText) {
-  return new Promise((resolve, reject) => {
-    // ESC/POS: Reset, alinhamento, fonte A, largura padrão, margem 0
+  return new Promise(async (resolve, reject) => {
     const WIDTH = detectPrinterWidth();
-    // Comando para largura: 32 colunas = 58mm, 48 colunas = 80mm
+    // Comando ESC/POS: Reset, alinhamento à esquerda, fonte A, largura, margem 0
     const widthCmd = WIDTH === 48 ? '\x1D\x57\x40\x02' : '\x1D\x57\x80\x01';
     const init = '\x1B@\x1B\x61\x00\x1B\x4D\x00' + widthCmd + '\x1D\x4C\x00\x00';
-    // Normaliza texto para ASCII seguro
     const safeText = normalizeText(rawText);
     const data = ENABLE_CUT ? `${init}${safeText}\n\x1D\x56\x41` : `${init}${safeText}\n`;
 
     if (IS_WINDOWS) {
-      // Windows: cria arquivo PRN e copia para impressora via comando net use
-      const tempFile = `${os.tmpdir()}\\print_${Date.now()}.prn`;
-      fs.writeFileSync(tempFile, data, 'binary');
-      exec(`notepad /p "${tempFile}"`, (err) => {
-        setTimeout(() => {
-          try { fs.unlinkSync(tempFile); } catch(e) {}
-        }, 2000);
-        if (err) return reject(err);
-        resolve();
-      });
+      // --- Impressão ESC/POS direta via USB usando escpos/escpos-usb ---
+      try {
+        if (!escpos || !escposUSB) throw new Error('escpos/escpos-usb não disponível');
+        // Busca primeira impressora USB disponível (ou filtra por nome se necessário)
+        const devices = escposUSB.findPrinter();
+        if (!devices || devices.length === 0) throw new Error('Nenhuma impressora USB encontrada');
+        // Usa a primeira impressora encontrada
+        const device = new escpos.USB();
+        const printer = new escpos.Printer(device);
+        device.open(function(err){
+          if (err) return reject(new Error('Erro ao abrir impressora USB: ' + err.message));
+          // Envia comandos ESC/POS puros
+          printer.raw(Buffer.from(data, 'ascii'));
+          if (ENABLE_CUT) printer.cut();
+          printer.close();
+          resolve();
+        });
+      } catch (e) {
+        return reject(new Error('ESC/POS USB: ' + e.message));
+      }
     } else {
-      // Linux: escreve direto no device, encoding ASCII
+      // --- Impressão direta no device Linux (ex: /dev/usb/lp1) ---
       fs.writeFile(PRINTER_PATH, data, { encoding: 'ascii' }, (err) => {
         if (err) return reject(err);
         resolve();
