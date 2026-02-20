@@ -41,9 +41,15 @@ app.use(bodyParser.json({ limit: '1mb' }))
 
 async function writeToPrinter(rawText) {
   return new Promise((resolve, reject) => {
-    // ESC/POS init + fonte A + largura de impressão 80mm (576 dots) + margem esquerda 0
-    const init = '\x1b\x40\x1b\x4d\x00\x1d\x57\x40\x02\x1d\x4c\x00\x00';
-    const data = ENABLE_CUT ? `${init}${rawText}\n\x1d\x56\x41` : `${init}${rawText}\n`;
+    // ESC/POS commands:
+    // \x1B@ = Reset
+    // \x1B\x61\x00 = Align LEFT (ESC a 0)
+    // \x1B\x4D\x00 = Font A
+    // \x1D\x57\x40\x02 = Print width 80mm
+    // \x1D\x4C\x00\x00 = Left margin 0
+    // \x1D\x56\x41 = Cut paper
+    const init = '\x1B@\x1B\x61\x00\x1B\x4D\x00\x1D\x57\x40\x02\x1D\x4C\x00\x00';
+    const data = ENABLE_CUT ? `${init}${rawText}\n\x1D\x56\x41` : `${init}${rawText}\n`;
     
     if (IS_WINDOWS) {
       // Windows: cria arquivo PRN e copia para impressora via comando net use
