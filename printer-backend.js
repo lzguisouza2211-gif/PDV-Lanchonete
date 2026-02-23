@@ -25,7 +25,7 @@ app.use(bodyParser.json())
 
 // ================= CONFIG =================
 
-const WIDTH = 42
+const WIDTH = 48
 
 const ESC = '\x1B'
 const GS = '\x1D'
