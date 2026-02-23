@@ -110,23 +110,24 @@ async function writeToPrinter(text) {
 
     if (IS_WINDOWS) {
       try {
-        const device = new escpos.USB()
-        const printer = new escpos.Printer(device)
-
-        device.open(err => {
-          if (err) return reject(err)
-          printer.raw(Buffer.from(data, 'binary'))
-          printer.close()
-          resolve()
-        })
+        if (!escpos || !escposUSB) throw new Error('escpos/escpos-usb não disponível');
+        // Usa o primeiro dispositivo USB encontrado (ou filtra por vendorId/productId se necessário)
+        const device = new escpos.USB();
+        const printer = new escpos.Printer(device);
+        device.open(function(err){
+          if (err) return reject(new Error('Erro ao abrir impressora USB: ' + err.message));
+          printer.raw(Buffer.from(data, 'binary'));
+          printer.close();
+          resolve();
+        });
       } catch (e) {
-        reject(e)
+        reject(e);
       }
     } else {
       fs.writeFile(PRINTER_PATH, data, { encoding: 'binary' }, err => {
-        if (err) return reject(err)
-        resolve()
-      })
+        if (err) return reject(err);
+        resolve();
+      });
     }
   })
 }
