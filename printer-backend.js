@@ -99,15 +99,16 @@ async function writeToPrinter(text) {
 function formatPedidoReceipt(pedido) {
   let out = ''
 
-  // Header
+  // ===== HEADER =====
   out += ALIGN_CENTER
   out += BOLD_ON + DOUBLE_SIZE
-  out += center(pedido.company?.name || 'Luizão Lanches') + '\n'
+  out += center(pedido.company?.name || 'AUTO COLOR') + '\n'
   out += NORMAL_SIZE + BOLD_OFF
 
-  out += center('RECIBO') + '\n'
+  out += center('PEDIDO') + '\n'
   out += line('=') + '\n'
 
+  // ===== INFO PEDIDO =====
   out += ALIGN_LEFT
   out += leftRight('Pedido:', pedido.pedidoId || '') + '\n'
   out += leftRight('Data:', new Date().toLocaleString('pt-BR')) + '\n'
@@ -117,7 +118,7 @@ function formatPedidoReceipt(pedido) {
 
   out += line('-') + '\n'
 
-  // Itens
+  // ===== ITENS =====
   if (Array.isArray(pedido.items)) {
     pedido.items.forEach(item => {
       const qtd = item.qty || item.quantidade || 1
@@ -125,29 +126,45 @@ function formatPedidoReceipt(pedido) {
       const preco = Number(item.price || item.preco || 0)
       const totalItem = (qtd * preco).toFixed(2)
 
+      // nome do item destacado
+      out += BOLD_ON
       out += leftRight(`${qtd}x ${nome}`, `R$ ${totalItem}`) + '\n'
+      out += BOLD_OFF
 
+      // observação
       if (item.observacao)
         out += `  Obs: ${normalize(item.observacao)}\n`
 
+      // adicionais
       if (item.adicionais)
         item.adicionais.forEach(a => {
           out += `   + ${normalize(a)}\n`
         })
+
+      out += '\n'
     })
   }
 
-  out += line('-') + '\n'
+  // ===== TOTAL =====
+  out += line('=') + '\n'
 
-  if (pedido.total)
-    out += BOLD_ON +
-      leftRight('TOTAL:', `R$ ${Number(pedido.total).toFixed(2)}`) +
-      '\n' + BOLD_OFF
+  if (pedido.total) {
+    out += ALIGN_RIGHT
+    out += BOLD_ON + DOUBLE_SIZE
+    out += `TOTAL R$ ${Number(pedido.total).toFixed(2)}\n`
+    out += NORMAL_SIZE + BOLD_OFF
+    out += ALIGN_LEFT
+  }
 
   if (pedido.payment || pedido.pagamento)
     out += leftRight('Pagamento:', pedido.payment || pedido.pagamento) + '\n'
 
-  out += '\n' + center('Obrigado pela preferencia!') + '\n\n\n'
+  // ===== RODAPE =====
+  out += '\n'
+  out += ALIGN_CENTER
+  out += center('Obrigado pela preferencia!') + '\n'
+  out += center('Volte sempre') + '\n'
+  out += '\n\n\n'
 
   return out
 }
