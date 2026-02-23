@@ -239,15 +239,21 @@ function formatClienteTicket(pedido) {
 
 app.post('/api/print', async (req, res) => {
   try {
+
     const { content, ...pedido } = req.body || {}
+
+    // Aceita tanto 'items' quanto 'itens' (português)
+    const items = pedido.items || pedido.itens;
+    pedido.items = items; // Garante que as funções de template funcionem
 
     if (content) {
       await writeToPrinter(content)
       return res.json({ success: true })
     }
 
-    if (!pedido.items && !pedido.pedidoId)
-      return res.status(400).json({ error: 'Envie content ou dados do pedido' })
+    if ((!items || !Array.isArray(items) || items.length === 0) && !pedido.pedidoId) {
+      return res.status(400).json({ error: 'Envie content ou dados do pedido (com itens) para imprimir' })
+    }
 
     // impressão dupla automática
     await writeToPrinter(formatKitchenTicket(pedido))
