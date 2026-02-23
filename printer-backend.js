@@ -1,281 +1,202 @@
 'use strict'
 
-// API para enviar texto ESC/POS para a Elgin i8 via serial/USB
-// Modo de fallback: Se impressora não disponível, loga no console
-// Variáveis de ambiente:
-// PRINTER_SERIAL_PATH (padrão: auto-detect ou /dev/ttyUSB0)
-// PRINTER_BAUD_RATE   (padrão: 9600)
-// PRINTER_API_PORT    (padrão: 4000)
-// PRINTER_ENABLE_CUT  (padrão: true)
-// PRINTER_FALLBACK_MODE (padrão: true) - Aceita requests mesmo sem printer
-
 const express = require('express')
 const cors = require('cors')
 const bodyParser = require('body-parser')
-const fs = require('fs')
 const os = require('os')
-const { exec } = require('child_process')
+const fs = require('fs')
 
 const IS_WINDOWS = os.platform() === 'win32'
-const PRINTER_NAME = process.env.PRINTER_NAME || 'ELGIN'
+const API_PORT = process.env.PRINTER_API_PORT || 4000
 const PRINTER_PATH = process.env.PRINTER_PATH || (IS_WINDOWS ? 'USB001' : '/dev/usb/lp1')
-const API_PORT = Number(process.env.PRINTER_API_PORT || 4000)
-const ENABLE_CUT = (process.env.PRINTER_ENABLE_CUT || 'true') !== 'false'
-const FALLBACK_MODE = (process.env.PRINTER_FALLBACK_MODE || 'true') !== 'false'
 
-// Libs para impressão USB no Windows
-let escpos, escposUSB;
+let escpos, escposUSB
 if (IS_WINDOWS) {
   try {
-    escpos = require('escpos');
-    escposUSB = require('escpos-usb');
-    escpos.USB = escposUSB;
-  } catch (e) {
-    console.warn('⚠️ Biblioteca escpos-usb não disponível:', e.message);
-  }
+    escpos = require('escpos')
+    escposUSB = require('escpos-usb')
+    escpos.USB = escposUSB
+  } catch {}
 }
 
 const app = express()
 app.use(cors())
-app.use(bodyParser.json({ limit: '1mb' }))
+app.use(bodyParser.json())
 
+// ================= CONFIG ELGIN =================
 
-// --- Helpers de formatação ESC/POS ---
+const WIDTH = 32 // Elgin i8 sempre 32 colunas
 
-// Remove acentos e caracteres incompatíveis com ESC/POS (ASCII)
-function normalizeText(text) {
-  if (!text) return '';
-  // Remove acentos e converte para ASCII
-  return text.normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove diacríticos
-    .replace(/[^\x20-\x7E\n]/g, '?'); // Substitui não-ASCII exceto \n
+const ESC = '\x1B'
+const GS = '\x1D'
+
+const INIT = ESC + '@'
+const ALIGN_LEFT = ESC + '\x61\x00'
+const ALIGN_CENTER = ESC + '\x61\x01'
+const BOLD_ON = ESC + '\x45\x01'
+const BOLD_OFF = ESC + '\x45\x00'
+const NORMAL_SIZE = GS + '\x21\x00'
+const DOUBLE_SIZE = GS + '\x21\x11'
+const CUT = GS + '\x56\x41'
+
+// ================= HELPERS =================
+
+function normalize(text = '') {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x20-\x7E\n]/g, '')
 }
 
-// Quebra texto em linhas de no máximo 'width' caracteres
-function wrapText(text, width) {
-  if (!text) return [];
-  const lines = [];
-  let line = '';
-  for (const word of text.split(/\s+/)) {
-    if ((line + (line ? ' ' : '') + word).length > width) {
-      if (line) lines.push(line);
-      line = word.length > width ? word.slice(0, width) : word;
-    } else {
-      line += (line ? ' ' : '') + word;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
+function center(text) {
+  text = normalize(text)
+  const space = Math.floor((WIDTH - text.length) / 2)
+  return ' '.repeat(Math.max(0, space)) + text
 }
 
-// Centraliza texto na largura
-function centerText(text, width) {
-  text = normalizeText(text);
-  if (text.length >= width) return text.slice(0, width);
-  const pad = width - text.length;
-  const left = Math.floor(pad / 2);
-  const right = pad - left;
-  return ' '.repeat(left) + text + ' '.repeat(right);
+function leftRight(left, right) {
+  left = normalize(left)
+  right = normalize(right)
+  const space = WIDTH - left.length - right.length
+  return left + ' '.repeat(Math.max(1, space)) + right
 }
 
-// Alinha esquerda/direita
-function alignLeftRight(left, right, width) {
-  left = normalizeText(left);
-  right = normalizeText(right);
-  const space = width - left.length - right.length;
-  if (space < 0) return (left + ' ' + right).slice(0, width);
-  return left + ' '.repeat(space) + right;
+function line(char = '-') {
+  return char.repeat(WIDTH)
 }
 
-// Detecta largura real da impressora (Elgin i8: 32 ou 48 colunas)
-function detectPrinterWidth() {
-  // Tenta detectar via env, senão assume 32 (mais seguro para Elgin i8)
-  const envWidth = Number(process.env.PRINTER_WIDTH);
-  if (envWidth === 32 || envWidth === 48) return envWidth;
-  // Heurística: se caminho padrão, assume 32, senão 48
-  if (PRINTER_PATH.includes('lp1') || PRINTER_PATH.includes('usb')) return 32;
-  return 48;
-}
+// ================= DRIVER ESTÁVEL =================
 
-// Envia texto ESC/POS puro para impressora térmica Elgin i8
-// Windows: usa escpos/escpos-usb (USB)
-// Linux: escreve direto no device
-async function writeToPrinter(rawText) {
-  return new Promise(async (resolve, reject) => {
-    const WIDTH = detectPrinterWidth();
-    // Comando ESC/POS: Reset, alinhamento à esquerda, fonte A, largura, margem 0
-    const widthCmd = WIDTH === 48 ? '\x1D\x57\x40\x02' : '\x1D\x57\x80\x01';
-    const init = '\x1B@\x1B\x61\x00\x1B\x4D\x00' + widthCmd + '\x1D\x4C\x00\x00';
-    const safeText = normalizeText(rawText);
-    const data = ENABLE_CUT ? `${init}${safeText}\n\x1D\x56\x41` : `${init}${safeText}\n`;
+async function writeToPrinter(text) {
+  return new Promise((resolve, reject) => {
+    const data = INIT + ALIGN_LEFT + NORMAL_SIZE + text + '\n' + CUT
 
     if (IS_WINDOWS) {
-      // --- Impressão ESC/POS direta via USB usando escpos/escpos-usb ---
       try {
-        if (!escpos || !escposUSB) throw new Error('escpos/escpos-usb não disponível');
-        // Busca primeira impressora USB disponível (ou filtra por nome se necessário)
-        const devices = escposUSB.findPrinter();
-        if (!devices || devices.length === 0) throw new Error('Nenhuma impressora USB encontrada');
-        // Usa a primeira impressora encontrada
-        const device = new escpos.USB();
-        const printer = new escpos.Printer(device);
-        device.open(function(err){
-          if (err) return reject(new Error('Erro ao abrir impressora USB: ' + err.message));
-          // Envia comandos ESC/POS puros
-          printer.raw(Buffer.from(data, 'ascii'));
-          if (ENABLE_CUT) printer.cut();
-          printer.close();
-          resolve();
-        });
+        const device = new escpos.USB()
+        const printer = new escpos.Printer(device)
+
+        device.open(err => {
+          if (err) return reject(err)
+          printer.raw(Buffer.from(data, 'binary'))
+          printer.close()
+          resolve()
+        })
       } catch (e) {
-        return reject(new Error('ESC/POS USB: ' + e.message));
+        reject(e)
       }
     } else {
-      // --- Impressão direta no device Linux (ex: /dev/usb/lp1) ---
-      fs.writeFile(PRINTER_PATH, data, { encoding: 'ascii' }, (err) => {
-        if (err) return reject(err);
-        resolve();
-      });
+      fs.writeFile(PRINTER_PATH, data, { encoding: 'binary' }, err => {
+        if (err) return reject(err)
+        resolve()
+      })
     }
-  });
+  })
 }
 
+// ================= TEMPLATE AUTOMÁTICO =================
 
-// Formata pedido em texto para impressão (ajustado para Elgin i8)
 function formatPedidoReceipt(pedido) {
-  const WIDTH = detectPrinterWidth();
-  const linhas = [];
-  const sep = '='.repeat(WIDTH);
-  const sepDash = '-'.repeat(WIDTH);
+  let out = ''
 
-  linhas.push(sep);
-  linhas.push(centerText('PEDIDO DE PRODUCAO', WIDTH));
-  linhas.push(sep);
-  linhas.push('');
+  // Header
+  out += ALIGN_CENTER
+  out += BOLD_ON + DOUBLE_SIZE
+  out += center(pedido.company?.name || 'Luizão Lanches') + '\n'
+  out += NORMAL_SIZE + BOLD_OFF
 
-  linhas.push(alignLeftRight('PEDIDO #', (pedido.pedidoId || 'SEM ID').toString(), WIDTH));
+  out += center('RECIBO') + '\n'
+  out += line('=') + '\n'
 
-  if (pedido.cliente) {
-    wrapText(pedido.cliente, WIDTH).forEach(l => linhas.push(l));
-  }
+  out += ALIGN_LEFT
+  out += leftRight('Pedido:', pedido.pedidoId || '') + '\n'
+  out += leftRight('Data:', new Date().toLocaleString('pt-BR')) + '\n'
 
-  linhas.push('');
-  linhas.push(sepDash);
+  if (pedido.cliente)
+    out += `Cliente: ${normalize(pedido.cliente)}\n`
+
+  out += line('-') + '\n'
 
   // Itens
-  if (Array.isArray(pedido.items) && pedido.items.length > 0) {
+  if (Array.isArray(pedido.items)) {
     pedido.items.forEach(item => {
-      const qtd = (item.quantidade || 1).toString().padStart(2, ' ');
-      let nome = item.nome || 'Item sem nome';
-      nome = normalizeText(nome);
-      // Nome do item pode ser longo, quebra se necessário
-      const itemLine = `${qtd}x ${nome}`;
-      wrapText(itemLine, WIDTH).forEach((l, i) => linhas.push(i === 0 ? l : ' '.repeat(4) + l));
+      const qtd = item.qty || item.quantidade || 1
+      const nome = normalize(item.name || item.nome || '')
+      const preco = Number(item.price || item.preco || 0)
+      const totalItem = (qtd * preco).toFixed(2)
 
-      // Observação do item
-      if (item.observacao) {
-        wrapText('Obs: ' + item.observacao, WIDTH - 2).forEach(l => linhas.push('  ' + l));
-      }
+      out += leftRight(`${qtd}x ${nome}`, `R$ ${totalItem}`) + '\n'
 
-      // Adicionais
-      if (item.adicionais && item.adicionais.length > 0) {
-        item.adicionais.forEach(add => {
-          wrapText('+ ' + add, WIDTH - 4).forEach(l => linhas.push('    ' + l));
-        });
-      }
-    });
+      if (item.observacao)
+        out += `  Obs: ${normalize(item.observacao)}\n`
+
+      if (item.adicionais)
+        item.adicionais.forEach(a => {
+          out += `   + ${normalize(a)}\n`
+        })
+    })
   }
 
-  linhas.push(sepDash);
-  linhas.push('');
+  out += line('-') + '\n'
 
-  // Total
-  if (pedido.total !== undefined) {
-    const total = typeof pedido.total === 'number'
-      ? pedido.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-      : pedido.total;
-    linhas.push(alignLeftRight('TOTAL:', total, WIDTH));
-  }
+  if (pedido.total)
+    out += BOLD_ON +
+      leftRight('TOTAL:', `R$ ${Number(pedido.total).toFixed(2)}`) +
+      '\n' + BOLD_OFF
 
-  // Pagamento
-  if (pedido.pagamento) {
-    const pag = (pedido.pagamento || '').toUpperCase();
-    linhas.push(alignLeftRight('PAG:', pag, WIDTH));
-  }
+  if (pedido.payment || pedido.pagamento)
+    out += leftRight('Pagamento:', pedido.payment || pedido.pagamento) + '\n'
 
-  // Observações gerais
-  if (pedido.observacao) {
-    linhas.push('');
-    linhas.push(centerText('OBSERVACOES', WIDTH));
-    wrapText(pedido.observacao, WIDTH).forEach(l => linhas.push(l));
-  }
+  out += '\n' + center('Obrigado pela preferencia!') + '\n\n\n'
 
-  linhas.push('');
-  linhas.push(sep);
-  linhas.push('');
-  linhas.push('');
-
-  // Normaliza todas as linhas para ASCII seguro
-  return linhas.map(normalizeText).join('\n');
+  return out
 }
 
+// ================= API (COMPATÍVEL COM SEU SISTEMA) =================
+
 app.post('/api/print', async (req, res) => {
-  const { content, pedidoId, cliente, items, total, pagamento, observacao } = req.body || {};
-  
-  // Se passou pedidoId, items ou cliente = é um pedido estruturado
-  let texto = content;
-  if (pedidoId || items) {
-    const pedido = { pedidoId, cliente, items, total, pagamento, observacao };
-    texto = formatPedidoReceipt(pedido);
-  }
-  
-  if (!texto) return res.status(400).json({ error: 'Envie content ou pedido estruturado' });
-
   try {
-    await writeToPrinter(texto);
-    console.log('✅ Impresso com sucesso');
-    return res.json({ ok: true, mode: 'printer' });
-  } catch (error) {
-    console.error('❌ Falha ao imprimir:', error.message);
-    // Fallback: aceita request mas só loga
-    if (FALLBACK_MODE) {
-      console.log('📄 MODO FALLBACK - Conteúdo recebido:');
-      console.log('-------------------------------------------');
-      console.log(texto);
-      console.log('-------------------------------------------');
-      return res.json({ ok: true, mode: 'fallback', warning: 'Impressora indisponível' });
-    }
-    return res.status(500).json({ error: error.message });
-  }
-});
+    const { content, ...pedido } = req.body || {}
 
-app.get('/api/health', async (req, res) => {
-  // Checa se o arquivo da impressora existe (Linux) ou se está no Windows
-  const printerAvailable = IS_WINDOWS ? true : fs.existsSync(PRINTER_PATH);
+    // Se veio texto pronto → imprime direto (igual seu backend antigo)
+    let texto = content
+
+    // Se veio pedido estruturado → gera layout profissional
+    if (!texto && (pedido.items || pedido.pedidoId)) {
+      texto = formatPedidoReceipt(pedido)
+    }
+
+    if (!texto)
+      return res.status(400).json({ error: 'Envie content ou dados do pedido' })
+
+    await writeToPrinter(texto)
+
+    res.json({ success: true })
+  } catch (e) {
+    console.error('Erro impressão:', e.message)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// ================= HEALTH =================
+
+app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     platform: os.platform(),
-    printerName: IS_WINDOWS ? PRINTER_NAME : PRINTER_PATH,
-    printerAvailable,
-    fallbackMode: FALLBACK_MODE,
-  });
-});
+    printer: PRINTER_PATH,
+    width: WIDTH
+  })
+})
 
-// Lista portas disponíveis
-app.get('/api/ports', async (req, res) => {
-  // Lista apenas o caminho configurado
-  res.json({ ok: true, ports: [PRINTER_PATH] });
-});
-
-app.listen(API_PORT, async () => {
-  console.log(`🖨️  Printer API rodando em http://localhost:${API_PORT}`);
-  console.log(`Plataforma: ${os.platform()}`);
-  console.log(`Configuração: ${IS_WINDOWS ? `Impressora: ${PRINTER_NAME}` : `Device: ${PRINTER_PATH}`}`);
-  console.log(`Corte automático: ${ENABLE_CUT}`);
-  console.log(`Modo fallback: ${FALLBACK_MODE ? 'ATIVO' : 'desativado'}`);
-  console.log('');
-  console.log('Endpoints disponíveis:');
-  console.log(`  POST http://localhost:${API_PORT}/api/print`);
-  console.log(`  GET  http://localhost:${API_PORT}/api/health`);
-  console.log(`  GET  http://localhost:${API_PORT}/api/ports`);
-});
+app.listen(API_PORT, () => {
+  console.log('')
+  console.log('===================================')
+  console.log('🖨️ Printer Server Luizão-Lanches')
+  console.log('===================================')
+  console.log('Porta:', API_PORT)
+  console.log('Plataforma:', os.platform())
+  console.log('Largura: 32 colunas (Elgin i8)')
+  console.log('Modo: COMPATÍVEL + PROFISSIONAL')
+  console.log('===================================')
+})
